@@ -25,7 +25,7 @@ https://science-responds.org/projects/ds#cv19_index
 ## My First Try
 
 The current version of the repository has a more brute force method (counting, tagging and ranking phrases) of mining the data only because this is my first project with any NLP. Also I am biased by many HEP cut and count publications.
-No ML-algos are used thus far because I am still getting my feet wet, but the code in this repository should help other novices like myself use simple NLP libraries to query the dataset. 
+No ML-algos are used thus far because I am still getting my feet wet, but the code in this repository should help other novices like myself use simple NLP libraries to query the dataset. I also include a simple KMeans fit algo to check how the body text lines that match keywords can be mapped onto topics.
 
 For ranking phrases I rely on two main NLP tools: PyTextRank and rake-nltk. 
 Additional information on these can be found here: 
@@ -46,10 +46,36 @@ if you don't have these:
 	pip install pytextrank
 	pip install rake-nltk
 ```
+Also be sure to grab the latest CORD-19 data from the project areas listed above. The executable scripts should run smoothly in python 3 :
+
+This script takes the metadata.csv file with the title and abstract and uses it to find key phrases in the title, abstract and matches between them. The script also flags which papers are likely about the cov19 epidemic (as opposed to SARS 2003 or MERS from 2012) based on a list of synonyms. You can also pass it a filtered CSV file in the same format if you have made one.
+```
+	python TitlePhraseRanking.py PATH_TO_YOUR CSV file
+```
+This script now contains found phrases in the abstract, title or both. In addition, we can get key words by merging all the abstracts flagged as covid19 in the previous step and rank the phrases in them using pyTextRank (this might take some time to run):
+
+```
+	python AbstractFullTextAnalyze.py
+```
+The output is a wordbag.txt file that is then used to rank phrases based on the "super" abstract, and also a csv file with the phrase, rank, and frequency. These quantities can also be plotted from this script.
+
+The total list of phrases is used to search the papers flagged as cov19 in the first step
+
+```
+ 	python SearchPapers.py PATH TO CORD 19 data
+```
+This produces a CSV file of keywords and lines that match those keywords, as well as a wordbag.txt file of all matched lines. Based on the matched lines we can try to build topics for the publications we have used. One way to do this is a KMeans algorithm (maybe not the best way?) and look at 2D projections of the principle features using a PCA (This is still in development) What is tuneable in this script is the number of clusters/topics fit in the algo. 
+
+```
+	python KMeansLearnTopics.py NCLUSTERS
+```
 
 ## Wishlist
-Outputs are currently CSV files, but ideally there would be some front end interface for researchers to use as well as a simple "fact sheet" for the general public. 
+Simple Wrapper code that uses the KMean clusters in the first step to start to make a loop from topics back to keywords
+
+Outputs are currently CSV files, but ideally there would be some front end interface for researchers to use as well as a simple "fact sheet" for the general public. So building more of a front-end
 
 For a fast-query tool, the above could be reworked to be an RDS. 
 
 Find key words with an ML approach instead of brute force so that it is both robust and fast.  
+
