@@ -3,7 +3,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import normalize
 import pandas as pd
 from textblob import TextBlob
-
+import sys
 def textblob_tokenizer(str_input):
     blob = TextBlob(str_input.lower())
     tokens = blob.words
@@ -11,7 +11,7 @@ def textblob_tokenizer(str_input):
     return words
 #f=open("wordbag.txt",'r')
 #WordBody=f.readline()
-df=pd.read_csv('SearchWithKeyWords.csv', low_memory=False)
+df=pd.read_csv('ProcessedCSV/SearchWithKeyWords.csv', low_memory=False)
 
 data = df['Text Matches']
 
@@ -26,7 +26,7 @@ tf_idf_array = tf_idf_norm.toarray()
 
 Features=pd.DataFrame(tf_idf_array, columns=tf_idf_vectorizor.get_feature_names()).head()
 
-number_of_clusters=30
+number_of_clusters=int(sys.argv[1])
 km = KMeans(n_clusters=number_of_clusters)
 
 km.fit(tf_idf)
