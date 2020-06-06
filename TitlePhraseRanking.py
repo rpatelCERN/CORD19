@@ -6,103 +6,138 @@ import csv
 from InitNLP import *
 import sys
 import string
+from PreProcessingText import clean_up_spacy
+from spacy.matcher import PhraseMatcher
+from spacy.matcher import Matcher
 
-def CoVQualifierMatch(phrases):
-    qualifier=""
+def AddSpacyMatchTokens(nlp):
+    matcher = Matcher(nlp.vocab)
+    ###Influenza seperate H1N1 from specific outbreaks like swine flu and bird flu
 
-    for p in phrases:####Phrases sorted by rank
-           #for punc in string.punctuation:p.replace(punc, "")####Don't want to use all english stop words only filter punctuation
-           if "coronavirus" in p and "2019" in p:####Most likely COVID19
-                   qualifier="covid19"
-                   #match=True
-                   #print(p)
-                   break
-           if "coronavirus" in p and ("2012" in p or "mers" in p or "middle east" in p) :#Middle East Respitory Syndrome
-                   qualifier="mers"
-                   match=True
-                   break
-           if "coronavirus" in p and "2003" in p:####2003 Sars epidemic
-                      qualifier="sars"
-                      #match=True
-                      #print(p)
-                      break
-           if("coronavirus" in p or "cov" in p  or "coronaviruses" in p):################Check additional context of phrase
-                   searchObj = re.search(r'(.*) CoV (.*?) .*',p,re.M|re.I)####Check CoV abbreviation with reg expression
-                   ####Look at proceding and preceding words
-                   if searchObj:
-                       qualifier=" %s * %s" %( searchObj.group(1),searchObj.group(2))
-                       #match=True
-                       break;
-                       
-                   else:
-                       searchObj = re.search(r'(.*) coronavirus (.*?) .*',p,re.M|re.I)#Check Coronavirus full word
-                       if searchObj:
-                               qualifier=" %s * %s" %( searchObj.group(1),searchObj.group(2))
-                               #match=True
-                               break;
-                   if not searchObj:
-                       searchObj = re.search(r'(.*) coronaviruses (.*?) .*',p,re.M|re.I) ###Check plural
-                       if searchObj:
-                               qualifier=" %s * %s" %( searchObj.group(1),searchObj.group(2))
-                               #match=True
-                               break;
-           for punc in string.punctuation:qualifier.replace(punc, "")####Don't want to use all english stop words only filter punctuation
-    return qualifier
+    BirdFlu=[{"LOWER":{'IN':["avian","avian-origin"]}},{"LOWER":{'IN':["influenza","flu"]}}]
+    matcher.add("BirdFlu",None, BirdFlu)
+    SwineFlu=[{"LOWER":"swine","POS":"ADJ"},{"LOWER":{'IN':["influenza","flu"]}}]
+    matcher.add("SwineFlu",None, SwineFlu)
+    #### Everything else is the H1N1 or a  more general Flu
+    Flu=[{'LOWER':{'NOT_IN': ["avian","avian-origin","swine","equine","canine","murine","bat"]}},{"LOWER":{'IN':["influenza","flu"]}}]
+    matcher.add("Flu",None, Flu)
+
+    #### Zoonotic influenza:
+    #AnimalFlu=[{"LOWER":"canine","LOWER":"equine","LOWER":"murine"},{"LOWER":"influenza","LOWER":"flu"}]
+    AnimalFlu=[{"LOWER":{'IN': ["equine","canine","murine","bat"]}},{"LOWER":"influenza"}]
+    matcher.add("ZoonoticFlu",None, AnimalFlu)
+
+    #### The same for coronaviruses
+    ZooCorona=[{"LOWER":{'IN':["feline","equine","canine","murine","bat","porcine","bovine","bat","coronavirus"]}},{"LOWER":{'IN':["coronavirus","coronaviruses", "respiratory coronavirus","enteric coronavirus","hku15","coronavirus-512","delta coronavirus","deltacoronavirus"]}}]
+    HumanCorona=[{"LOWER":"human"},{"LOWER":"coronavirus"},{"LOWER":{'IN':["nl63","oc43","229e","229E-infected","infections"]},"OP": "*"}]
+    CoronaRemainder=[{"LOWER":{'NOT_IN':["equine","canine","murine","bat","porcine","bovine"]}},{"LOWER":{'IN':["coronavirus", "respiratory coronavirus"]}}]
+
+    matcher.add("ZoonoticCorona",None, ZooCorona)
+    matcher.add("HumanCorona",None, HumanCorona)
+
+
+    #matcher.add("Corona",None, CoronaRemainder)
+
+    return matcher
+
+
+def AddSpacyMatchPatterns(nlp):
+    matcher = PhraseMatcher(nlp.vocab, attr='LOWER')
+    #####NOTE Patterns are case sensitive so may still need token matching for more coverage
+    #### Titles though are always capitalized
+    covid19_synonyms=["COVID","SARS-CoV-2","2019-nCoV","Coronavirus Disease","coronavirus disease","Novel Coronavirus","novel coronavirus","novel human coronavirus","Novel Human Coronavirus","ncov ","Wuhan Coronavirus"]###First three based on my inital guess, the rest found with 2nd step using pyTextRank from all the found titles in a wordbag
+
+    patterns = [nlp.make_doc(text) for text in covid19_synonyms]#### OR Could be more general as a list of dicts
+    matcher.add("COVID19", None, *patterns)
+    HIVNames=["HIV-1", "HIV-2","HIV","AIDS","Human Immunodeficiency Virus"];
+    patterns = [nlp.make_doc(text) for text in HIVNames]
+    matcher.add("HIV", None, *patterns)
+    patterns = [nlp.make_doc("Ebola")]
+    matcher.add("Ebola", None, *patterns)
+    Sars2003=["SARS","SARS-CoV"]
+    patterns = [nlp.make_doc(text) for text in Sars2003]
+    matcher.add("SARS2003", None, *patterns)
+    MERS2012=["MERS","MERS-CoV","Middle East respiratory"]
+    patterns = [nlp.make_doc(text) for text in MERS2012]
+    matcher.add("MERS", None, *patterns)
+
+    Zika=["zika","ZIKAV","Zika"]
+    patterns = [nlp.make_doc(text) for text in Zika]
+    matcher.add("zika", None, *patterns)
+    patterns = [nlp.make_doc("West Nile")]
+    matcher.add("WNileV", None, *patterns)
+    GV=["viral gastroenteritis","Gastroenteritis"]
+    patterns = [nlp.make_doc(text) for text in GV]
+    matcher.add("VGastroEntritis", None, *patterns)
+
+    #### For these need to know if it is human or non-human (zoonotic)
+    #matcher.add("Flu", None, Flu)
+    return matcher;
+
 def MatchTitlePhrasesAndAbstract(Titlephrases, AbstractPhrases ):
     tempQual=[]
     for p in AbstractPhrases:
+        #if p=="covid19":continue ####This is a marker I add myself to flag papers that feature one of the COVID19 synonyms
         for titlep in Titlephrases:
-            if titlep in p:
-                tempQual.append(p)
+            if titlep in p:tempQual.append(p)
     return tempQual;
 
 df=pd.read_csv('%s' %sys.argv[1], low_memory=False) #Metadata for CORD-19
-covid19_synonyms=["COVID","SARS-CoV-2","2019-nCoV","coronavirus disease","novel coronavirus","ncov coronavirus","wuhan coronavirus"]###First three based on my inital guess, the rest found with 2nd step using pyTextRank from all the found titles in a wordbag
+####Use these to create SPACY match patterns
+
+
 #####Global Text ranking parameters
 StopWords="StopWordsTitle.txt"
+stopwordlist=StopWordslist(StopWords);
+
 #NEW COLUMNS to FILL
+AllTitles=[]
 Titlequalifiers=[]
-qualifiers=[]
+ViralMatch=[]
 Matchedqualifiers=[]
+nlpsci=InitSciSpacy();
+matcher=AddSpacyMatchPatterns(nlpsci)
+matchtokens=AddSpacyMatchTokens(nlpsci);
+nlp = InitNLPRake(StopWords);
 
-
+#nlp=InitSciSpacy();
+covid19_synonyms=["COVID","SARS-CoV-2","2019-nCoV","coronavirus disease","novel coronavirus","ncov coronavirus","wuhan coronavirus"]###First three based on my inital guess, the rest found with 2nd step using pyTextRank from all the found titles in a wordbag
 for i in range(len(df)):
     title=df.loc[i,'title']
+    pubtime=df.loc[i,'publish_time']
+
     abstracttext=df.loc[i,'abstract']
-    if title=="null" or isinstance(title,float):title="title";
-    SeveralTitleQual=[]
-    
-    for c in covid19_synonyms:
-        if title.find(c)>=0 and title.find("middle east")==-1:#####Exclude mers
-            SeveralTitleQual.append('covid19');
-    nlp = InitNLPRake(StopWords);
-    phrases=KeyPhrases(title,nlp);
-    for p in phrases:SeveralTitleQual.append(p)
-    Titlequalifiers.append(','.join(SeveralTitleQual));
-    if abstracttext is "":
-        qualifiers.append('')
-        Matchedqualifiers.append('')
-        continue #nan for missing entries
-    if pd.isnull(abstracttext):
-        qualifiers.append('')
-        Matchedqualifiers.append('')
-        continue #nan for missing entries
-    #nlp = Rake()
-    phrases=KeyPhrases(abstracttext,nlp); #just parse pharses and rank them
-    
-    qualifier=CoVQualifierMatch(phrases)
-    if qualifier=="":
-        qualifiers.append('Not Found')
-    else:
-        qualifiers.append(qualifier)
-####Now have to sets of qualifiers from the title and the abstract, see what matches:
-    if "covid19" in SeveralTitleQual:
-        MatchedPhrases=MatchTitlePhrasesAndAbstract(phrases,SeveralTitleQual)
-        Matchedqualifiers.append(MatchedPhrases);
-    else: Matchedqualifiers.append('')
-print(i,len(Matchedqualifiers))
+    if title=="null" or isinstance(title,float):
+        title="title";
+
+    #print(title,pubtime)
+    AllTitles.append(title)
+docs = list(nlpsci.pipe(AllTitles))
+for doc in docs:
+    #print(doc.text)
+    matches=matcher(doc)
+    tokmatches=matchtokens(doc)
+    CheckCovid=False
+    TempID=[]
+
+    #for match_id, start, end in matches:
+    for match_id, start, end in matches:
+        #if nlpsci.vocab.strings[match_id]=="COVID19":CheckCovid=True
+        TempID.append(nlpsci.vocab.strings[match_id])
+    for match_id, start, end in tokmatches:TempID.append(nlpsci.vocab.strings[match_id])
+    ViralMatch.append(TempID)
+    #if CheckCovid:
+    Titlephrases=KeyPhrases(doc,nlp);
+    if(len(Titlephrases)>0):Titlephrases=clean_up_spacy(','.join(Titlephrases),nlpsci);
+    print(doc.text)
+    print(Titlephrases)
+    Titlequalifiers.append(Titlephrases)###Filled Per Title
+
+    #else:
+    #    Titlequalifiers.append("NULL")
+
+print(i,len(ViralMatch))
 #FILL CSV with Keywords found per paper
 df.insert(8, "Title Qualifier Words", Titlequalifiers, True);
-df.insert(9, "Abstract Qualifier Words", qualifiers, True);
-df.insert(10, "Matched Abstract Qualifier Words", Matchedqualifiers, True);
-df.to_csv(r'ProcessedCSV/AnalyzedTitlesAbstract.csv', index = True)
+df.insert(9, "Viral Tag", ViralMatch, True);
+df.to_csv(r'ProcessedCSV/TestLatestData.csv', index = True)
