@@ -1,4 +1,6 @@
 import spacy
+import scispacy
+import en_core_sci_sm
 import pytextrank
 from rake_nltk import Rake
 
@@ -9,6 +11,10 @@ def InitNLPPyTextRank():
     nlpPyRank.add_pipe(tr.PipelineComponent, name="textrank", last=True)
 
     return nlpPyRank
+def InitSciSpacy():
+    nlp = en_core_sci_sm.load()
+    return nlp;
+
 
 def InitNLPRake(StopWords):
     nlp=Rake(StopWords);
@@ -17,8 +23,24 @@ def InitNLPRake(StopWords):
 def TextRank(text,nlp):
  doc = nlp(text)
  return doc._.phrases
- 
-def KeyPhrases(text,nlp):
-    nlp.extract_keywords_from_text(text)
+
+def KeyPhrases(doc,nlp):
+    nlp.extract_keywords_from_text(doc.text)
     doc =nlp.get_ranked_phrases();
     return doc
+
+def KeySciPhrases(text,nlp):
+    doc = nlp(text)
+    #doc =nlp.get_ranked_phrases();
+    return doc.ents
+
+def StopWordslist(StopWordsToAdd):
+    spacy_nlp = spacy.load('en_core_web_sm')
+    spacy_stopwords = spacy.lang.en.stop_words.STOP_WORDS
+    fstop=open(StopWordsToAdd)
+    StopList=[]
+    for line in fstop:
+        StopList.append(line.rstrip('\n'));
+    fstop.close();
+    spacy_stopwords=spacy_stopwords.union(set(StopList));
+    return spacy_stopwords;

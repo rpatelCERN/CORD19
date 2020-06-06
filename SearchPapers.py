@@ -4,6 +4,7 @@ import csv
 import matplotlib.pyplot as plt
 import string
 import sys
+from rank_bm25 import BM25Okapi
 
 def CleanupKeyword(word):
         word=word.replace("[","");
@@ -20,7 +21,11 @@ PublicationsMined=[]
 KeyWordsUsed=[]
 KeyWordsFound=[]
 LinesFound=[]
+Allines=""
 FullAbstractKeys=[]
+CandidateCategories=[]
+f=open('wordbagTotal.txt','w');
+
 for i in range(len(dfRank  )):
     AbstractOnlyKeywords=dfRank ['text']
     TextRank=dfRank .loc[i,'rank']
@@ -32,6 +37,13 @@ for i in range(len(df)):
     TitleKeyWords=df.loc[i,'Title Qualifier Words']
     if isinstance(TitleKeyWords,float):continue
     if "covid19" not in TitleKeyWords:continue
+    TitleKeyWords=TitleKeyWords.replace("covid19,","")
+    Categories=TitleKeyWords.split(",");
+    #print(TitleKeyWord)
+    #print(Categories)
+    #for c in Categories:
+        #if c=="covid19":continue
+    #print(c)
     AbstractKeyWords=df.loc[i,'Matched Abstract Qualifier Words']
     if isinstance(AbstractKeyWords,float):continue
     AbstractKeyWords=AbstractKeyWords.split(",");
@@ -39,20 +51,21 @@ for i in range(len(df)):
     Cleanup=[]
     for a in AbstractKeyWords:
         a=CleanupKeyword(a)
-        FullAbstractKeys.append(a)
-    FullAbstractKeys=list(set(FullAbstractKeys));#unique instances
-    if FullAbstractKeys==[''] or len(FullAbstractKeys)<1:continue
+        Cleanup.append(a)
+    AbstractKeyWords=list(set(Cleanup));#unique instances
+    if AbstractKeyWords==[''] or len(AbstractKeyWords)<1:continue
     #AbstractKeyWords=['wet market']
     sha=df.loc[i,'sha']
     sha=sha.split("; ")
     location=df.loc[i,'full_text_file^M']
-    
+
     for s in sha:
         filename=PATH+location+"/"+location+"/"+s+".json"
         #print(AbstractKeyWords)
-        MatchInfo=SearchKeyWordList(FullAbstractKeys,filename)
+        MatchInfo=SearchKeyWordList(AbstractKeyWords,filename)
         PublicationsMined.append(filename)
-        KeyWordsUsed.append(FullAbstractKeys)
+        KeyWordsUsed.append(AbstractKeyWords)
+        #
         #if(len(MatchInfo)>0):
         MatchedKeys=[]
         MatchedLineToKey=[]
@@ -60,12 +73,14 @@ for i in range(len(df)):
              #print(m[1]+".")#Matched line
              MatchedKeys.append(m[0]);
              MatchedLineToKey.append(m[1]+".")
+             f.write(m[1]);
+        f.write("\n");
         MatchedKeys=list(set(MatchedKeys))#unique list
         KeyWordsFound.append(MatchedKeys);
         LinesFound.append(MatchedLineToKey);
-
-
-mapofWords={'sha':PublicationsMined,'Initial Keywords':KeyWordsUsed, 'Matched Keywords':KeyWordsFound, 'Text Matches':LinesFound}
+        CandidateCategories.append(Categories);
+f.close();
+mapofWords={'sha':PublicationsMined,'Candidate Category':CandidateCategories,'Initial Keywords':KeyWordsUsed, 'Matched Keywords':KeyWordsFound, 'Text Matches':LinesFound}
 PlotDF=pd.DataFrame(mapofWords)
 PlotDF.to_csv(r'ProcessedCSV/SearchWithKeyWords.csv', index = True)
 
@@ -73,13 +88,13 @@ f=open('wordbag.txt','w');
 for list in LinesFound:
     if len(list)<1:continue;
     text=""
-    text=text.join(list)
+    text="\n"+text.join(list)
     f.write(text)
 f.close()
 
 
     #if(i>10):break;
         #for list in Matchedline:
-            
+
         #print(filename)
         #print(Nlines_in_paper(filename));
