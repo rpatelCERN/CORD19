@@ -4,12 +4,13 @@ import spacy
 from spacy import displacy
 from gensim.corpora import Dictionary
 from gensim.models import LdaModel
+
 import matplotlib.pyplot as plt
 import sklearn
 import keras
 import pandas as pd
 from gensim.models import CoherenceModel, LdaModel, LsiModel, HdpModel
-from gensim.models.wrappers import LdaMallet
+#from gensim.models.wrappers import LdaMallet
 import pyLDAvis.gensim
 import sklearn
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
@@ -32,17 +33,19 @@ from PreProcessingText import clean_up_spacy
 from JSONInputsBodyText import *
 
 warnings.filterwarnings('ignore')  # Let's not pay heed to them right now
+PATH="../../CORD-19-research-challenge/"
 
 #nlp = spacy.load("en")
 
-def display_topics(model, feature_names, no_top_words,topicIndex):
+def display_topics(model, feature_names, no_top_words,topicIndex,writeout=False):
     for topic_idx, topic in enumerate(model.components_):
         print("Topic %d:" % (topic_idx))
-        print(" ".join([feature_names[i]
+        print(", ".join([feature_names[i]
             for i in topic.argsort()[:-no_top_words - 1:-1]]))
         if topic_idx is not topicIndex:continue
+        if not writeout:continue
         f=open("TopicWords%d.txt" %topicIndex,'w')
-        f.write(" ".join([feature_names[i]
+        f.write(", ".join([feature_names[i]
             for i in topic.argsort()[:-no_top_words - 1:-1]]))
         f.close()
 def GetTopicWords(model,feature_names,topicIndex,no_top_words ):
@@ -75,7 +78,6 @@ def TopicKeywordSearch(KeywordsinTopic,nlp,matcher,topicnumber):
     print(len(df))
     #cnt = Counter()
     #fout=open("%s.txt" %KeywordsinTopic[0], 'w')
-    fout=open("Topic%d.txt" %topicnumber, 'w')
     MatchedText=[]
 
     for i in range(len(df)):
@@ -106,9 +108,12 @@ def TopicKeywordSearch(KeywordsinTopic,nlp,matcher,topicnumber):
                 #print(span,doc.text)#### Line in the body text
                 #print(nlp.vocab.strings[match_id],span)
                 MatchedText.append(doc.text)
-                fout.write(doc.text +'\n')
+                #
+    MatchedText=list(set(MatchedText))
+    fout=open("Topic%d.txt" %topicnumber, 'w')
+    for text in MatchedText:fout.write(text +'\n')
     fout.close()
-    return list(set(MatchedText))
+    return MatchedText
     '''
         for s in sha:
             filename=PATH+location+"/"+location+"/"+s+".json"
@@ -175,7 +180,7 @@ def FillSciKitText(doc,my_stop_words):
                 texts.append(article)
                 skl_texts.append(' '.join(article))
     #skl_texts=list(set(skl_texts))#### Only unique entries
-    return skl_texts
+    return skl_texts,texts
 def CreateLDATopics(skl_texts,no_features,no_topics):
 
     #######Count vectorizer and LDA SciTopics############
@@ -191,17 +196,68 @@ def CreateLDATopics(skl_texts,no_features,no_topics):
     return lda,tf_feature_names
 def CreateNMFTopics(skl_texts,no_features,no_topics):
     #######TFIDF vectorizer and NMF SciTopics############
-    tfidf_vectorizer = TfidfVectorizer(max_features=no_features)
+    tfidf_vectorizer = TfidfVectorizer(max_features=no_features,ngram_range=(2,3))
     tfidf = tfidf_vectorizer.fit_transform(skl_texts)
     tfidf_feature_names = tfidf_vectorizer.get_feature_names()
     nmf = NMF(n_components=no_topics, random_state=1,beta_loss='kullback-leibler', solver='mu', max_iter=1000, alpha=.1,l1_ratio=.5).fit(tfidf)
     return nmf,tfidf_feature_names
+#######Implement the sklearn version of this
+def compute_coherence_values( skl_texts,texts,no_features, limit, start=2, step=3):
+    """
+    Compute c_v coherence for various number of topics
 
+    Parameters:
+    ----------
+    dictionary : Gensim dictionary
+    corpus : Gensim corpus
+    texts : List of input texts
+    limit : Max num of topics
+
+    Returns:
+    -------
+    model_list : List of LDA topic models
+    coherence_values : Coherence values corresponding to the LDA model with respective number of topics
+    """
+    coherence_values = []
+    model_list = []
+    dictionary = Dictionary(texts)
+    dictionary.filter_extremes(
+    no_below=3,
+    no_above=0.85,
+    keep_n=5000
+    )
+    corpus = [dictionary.doc2bow(text) for text in texts]
+    for num_topics in range(start, limit, step):
+        print(num_topics)
+        model = gensim.Nmf(
+        corpus=corpus,
+        num_topics=num_topics,
+        id2word=dictionary,
+        chunksize=2000,
+        passes=5,
+        kappa=.1,
+        minimum_probability=0.01,
+        w_max_iter=300,
+        w_stop_condition=0.0001,
+        h_max_iter=100,
+        h_stop_condition=0.001,
+        eval_every=10,
+        normalize=True,
+        random_state=42
+        )
+        #model = CreateNMFTopics(skl_texts,no_features,num_topics)
+
+	    #model = gensim.models.wrappers.LdaMallet(mallet_path, corpus=corpus, num_topics=num_topics, id2word=id2word)
+        model_list.append(model)
+        coherencemodel = CoherenceModel(model=model, texts=texts, dictionary=dictionary, coherence='c_v')
+        #coherence_values.append(coherencemodel.get_coherence())
+
+    return model_list, coherence_values
 
 def BuildTopics(doLDA,PATH,no_topics,no_top_words,no_features):
 
-    no_topics =10*2
-    no_top_words = 5*2
+    #no_topics =10*2
+    #no_top_words = 5*2
 
 
 
@@ -212,7 +268,7 @@ def BuildTopics(doLDA,PATH,no_topics,no_top_words,no_features):
     #PATH="../CORD-19-research-challenge/"#"%s" %sys.argv[1]
 
     print("HERE")
-    
+
     f=open("TitlewordbagTotal.txt",'w');
     df=pd.read_csv('ProcessedCSV/AnalyzedTitlesAbstract.csv', low_memory=False)
     ###For testing words to look for:
@@ -242,28 +298,31 @@ def BuildTopics(doLDA,PATH,no_topics,no_top_words,no_features):
     text=f.read();
 
     doc = nlp(text.lower())
-    my_stop_words = ['novel','preprint','copyright','medrxiv','author','peer','holder','et_al','cov', '\\ncov', '2019', 'ncov', 'sars', 'covid', 'coronavirus','hcov','19','2019','2019-ncov','covid-19','covid-','cov','title']
+    my_stop_words = ['novel','preprint','copyright','medrxiv','author','peer','holder','et_al','cov', '\\ncov', '2019', 'ncov', 'sars', 'covid', 'coronavirus','hcov','19','2019','2019-ncov','covid-19','covid-','cov','title','human','pneumonia']
     my_stop_words.append('wuhan')
     my_stop_words.append('china')
     my_stop_words.append('disease')
     my_stop_words.append('outbreak')
+    my_stop_words.append('acute')
+    my_stop_words.append('syndrome')
+    my_stop_words.append('datum')
 
-    skl_texts=FillSciKitText(doc,my_stop_words)
+    skl_texts,texts=FillSciKitText(doc,my_stop_words)
 
 
     print("\nTopics in NMF model (generalized Kullback-Leibler divergence):")
     nmf,tfidf_feature_names=CreateNMFTopics(skl_texts,no_features,no_topics)
     #print("done in %0.3fs." % (time() - t0))
-
+    #print(tfidf_feature_names)
     if doLDA: #Do LDA:
         #######Count vectorizer and LDA SciTopics############
         lda,tf_feature_names=CreateLDATopics(skl_texts,no_features,no_topics)
         display_topics(lda, tf_feature_names, no_top_words)
         #print("done in %0.3fs." % (time() - t0))
     #### HERE MAKE A LOOP over topics
-
     for i in range(no_topics):
-        display_topics(nmf, tfidf_feature_names, no_top_words,i)
+        #if i is not 2:continue
+        display_topics(nmf, tfidf_feature_names, no_top_words,i,True)
 
         #if i is not 19:continue
         TestKeyWords=GetTopicWords(nmf,tfidf_feature_names,i,no_top_words); #### About vaccines and drug interventions
@@ -275,8 +334,64 @@ def BuildTopics(doLDA,PATH,no_topics,no_top_words,no_features):
         matcher = Matcher(nlpsci.vocab)
         for doc in docs:AddSpacyMatchPatterns(nlpsci,doc,matcher,"KeyPhrasesTopic%d"%i)
         MatchedText=TopicKeywordSearch(MatchedPhrases,nlpsci,matcher,i)
-#PATH="../../CORD-19-research-challenge/"
-#no_topics=20
-#no_top_words=30
-#no_features=600
-#BuildTopics(False,PATH,no_topics,no_top_words,no_features)
+
+def CoherenceScan(PATH,no_top_words,no_features):
+        nlp = InitNLPPyTextRank();
+        #no_features = 2000
+        #no_top_words = 5*2
+
+        #PATH="../CORD-19-research-challenge/"#"%s" %sys.argv[1]
+
+        print("HERE")
+
+        f=open("TitlewordbagTotal.txt",'w');
+        df=pd.read_csv('ProcessedCSV/AnalyzedTitlesAbstract.csv', low_memory=False)
+        ###For testing words to look for:
+        TestWords=[' study',' ace2',' receptor',' expression',' single',' human',' domain',' cell',' bind',' infection',' protein',' cause',' descriptive',' immune',' clinical',' analysis',' case',' center',' epidemic', ' epidemiological']
+        #TestWords=[' vaccine ',' ace2 ',' ship ',' healthcare ',' policy ',' policies ', ' intensive ',' potential ',' quarantine ',' pneumonia ']
+        for i in range(len(df)):
+            TitleQualifiers=df.loc[i,'Title Qualifier Words']
+            ViralID=df.loc[i,'Viral Tag']
+            #WHOCOV=df.loc[i,'who_covidence_id']
+            if TitleQualifiers=="null" or isinstance(TitleQualifiers,float):continue
+            #if isinstance(WHOCOV,float): print(TitleQualifiers)
+
+    #        if not ("COVID19" in ViralID or not isinstance(WHOCOV,float))  :continue
+            if not "COVID19" in ViralID   :continue
+            #Writeout=False
+            #for test in TestWords:
+                #if(test in TitleQualifiers ):
+            Writeout=True;
+            #print(TitleQualifiers)
+            #break;
+            if Writeout:f.write(TitleQualifiers+'\n')
+
+
+        f.close()
+        f=open("TitlewordbagTotal.txt",'r');
+        f.seek(0)
+        text=f.read();
+
+        doc = nlp(text.lower())
+        my_stop_words = ['novel','preprint','copyright','medrxiv','author','peer','holder','et_al','cov', '\\ncov', '2019', 'ncov', 'sars', 'covid', 'coronavirus','hcov','19','2019','2019-ncov','covid-19','covid-','cov','title','human','pneumonia']
+        my_stop_words.append('wuhan')
+        my_stop_words.append('china')
+        my_stop_words.append('disease')
+        my_stop_words.append('outbreak')
+        my_stop_words.append('acute')
+        my_stop_words.append('syndrome')
+        my_stop_words.append('datum')
+
+        skl_texts,texts=FillSciKitText(doc,my_stop_words)
+        texts=[]
+
+        model_list,coherence_values=compute_coherence_values(skl_texts,texts,no_features, 15, start=2, step=1)
+        print(coherence_values)
+def RunTopicBuilding():
+    no_topics=20
+    no_top_words=20
+    no_features=600
+
+    #CoherenceScan(PATH,no_top_words,no_features)
+    BuildTopics(False,PATH,no_topics,no_top_words,no_features)
+#RunTopicBuilding()
