@@ -5,9 +5,9 @@ from spacy import displacy
 from gensim.corpora import Dictionary
 from gensim.models import LdaModel
 
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 import sklearn
-import keras
+#import keras
 import pandas as pd
 from gensim.models import CoherenceModel, LdaModel, LsiModel, HdpModel
 #from gensim.models.wrappers import LdaMallet

@@ -2,6 +2,8 @@ curl -O https://bootstrap.pypa.io/get-pip.py
 python3 get-pip.py
 export PATH="$HOME/.local/bin:$PATH"
 
+pip install gensim
+
 pip install -U spacy
 
 pip install -U scikit-learn
