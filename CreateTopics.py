@@ -33,7 +33,7 @@ from PreProcessingText import clean_up_spacy
 from JSONInputsBodyText import *
 
 warnings.filterwarnings('ignore')  # Let's not pay heed to them right now
-PATH="../../CORD-19-research-challenge/"
+PATH="../../551982_1190426_bundle_archive/"
 
 #nlp = spacy.load("en")
 
@@ -72,30 +72,55 @@ def TopicKeywordSearchBM25(KeywordsinTopic):
             doc_scores,topsentences=BM25Search(BodyText,key,10)
             print(key,doc_scores,topsentences)
 
-def TopicKeywordSearch(KeywordsinTopic,nlp,matcher,topicnumber):
-    df=pd.read_csv('ProcessedCSV/AnalyzedTitlesAbstract.csv', low_memory=False)
+def TopicKeywordSearch(KeywordsinTopic,nlp,matcher,topicnumber,SelectedRows):
+    #print(SelectedRows.head())
+    #df=pd.read_csv('ProcessedCSV/TestLatestData.csv', low_memory=False)##### Just do this once and pass it to different functions
+    #df.loc[df['Viral Tag'].contains("COVID19"), 'Covid Paper Tag'] = True
+    #df.loc[df['who_covidence_id'].notnull(), 'Covid Paper Tag'] = True
+    #df.loc[df['Covid Paper Tag'].isnull(),'Covid Paper Tag']=False
+    #DF_new_row=SelectedRows.loc[SelectedRows['pmc_json_files']!='' and SelectedRows['pdf_json_files']!='']
+    '''
+    SelectedRows.loc[SelectedRows['pmc_json_files'].notnull(),'Full Text']=True
+    SelectedRows.loc[SelectedRows['pdf_json_files'].notnull(),'Full Text']=True
+    SelectedRows.loc[SelectedRows['Full Text'].isnull(),'Full Text']=False
 
-    print(len(df))
+    AllPapers=SelectedRows[SelectedRows['Full Text']==True]
+    AllPapers.loc[AllPapers['pmc_json_files'].notnull(),'Full PMC']=True
+    AllPapers.loc[AllPapers['pdf_json_files'].notnull(),'Full PDF']=True
+    '''
+    SelectedRows.loc[SelectedRows['pmc_json_files'].notnull(),'Full PMC']=True
+    SelectedRows.loc[SelectedRows['pdf_json_files'].notnull(),'Full PDF']=True
+    SelectedRows.loc[SelectedRows['pmc_json_files'].notnull(),'Full PDF']=False#### look at PMC if both PMC and PDF are available
+
+    #SelectedRows.loc[SelectedRows['pmc_json_files'].isnull(),'Full PMC']=False
+    PMCPapers=SelectedRows[SelectedRows['Full PMC']==True]['pmc_json_files'].tolist()
+    PDFPapers=SelectedRows[SelectedRows['Full PDF']==True]['pdf_json_files'].tolist()
+    PMCPapers.extend(PDFPapers)
+    #ListOfTitleWords=SelectedRows['Title Qualifier Words'].tolist()    #print(len(df))
+
     #cnt = Counter()
     #fout=open("%s.txt" %KeywordsinTopic[0], 'w')
     MatchedText=[]
 
-    for i in range(len(df)):
-        TitleKeyWords=df.loc[i,'Title Qualifier Words']
-        if isinstance(TitleKeyWords,float):continue
-        ViralID=df.loc[i,'Viral Tag']
+    for location in PMCPapers:#### Can't do loc anymore
 
-        if not "COVID19" in ViralID:continue
-        Titles=df.loc[i,'title']
+        #TitleKeyWords=ListOfTitleWords[i]#df.loc[i,'Title Qualifier Words']
+        #if isinstance(TitleKeyWords,float):continue
+        #ViralID=df.loc[i,'Viral Tag']
+
+        #if not "COVID19" in ViralID:continue
+        #Titles=df.loc[i,'title']
         #print(Titles)
 
-        sha=df.loc[i,'sha']
-        sha=sha.split("; ")
-        location=df.loc[i,'full_text_file^M']
+        sha=location.split("; ")
+        #sha=sha.split("; ")
+        #location=SelectedRows.loc[i,'pmc_json_files']
+        #if(isinstance(location,float)):location=SelectedRows.loc[i,'pdf_json_files']
         #print(KeywordsinTopic)
         BodyText=[]
         for s in sha:
-            filename=PATH+location+"/"+location+"/"+s+".json"
+            filename=PATH+s
+            #filename=PATH+location+"/"+location+"/"+s+".json"
             for i in range(0,Nlines_in_paper(filename)):
                 LineSentence=line_in_paper(filename,i).split('.')
                 for l in LineSentence:BodyText.append(l)### Linesin the paper
@@ -134,13 +159,19 @@ def AddSpacyMatchPatterns(nlp,doc,matcher,patternName):
     #print(pattern, len(pattern))
     if len(pattern)>1 :matcher.add(patternName,None,pattern)
     return matcher
-def TopicKeywordAbstractSearch(KeywordsinTopic,nlp,minRank):####Use pyTextRank
-    df=pd.read_csv('ProcessedCSV/AnalyzedTitlesAbstract.csv', low_memory=False)
-    #print(len(df))
+def TopicKeywordAbstractSearch(KeywordsinTopic,nlp,minRank,SelectedRows):####Use pyTextRank
+    SelectedRows.loc[SelectedRows['abstract'].notnull(),'FilledAbs']=True
+    SelectedRows.loc[SelectedRows['abstract'].isnull(),'FilledAbs']=False
+    Abstracts=SelectedRows[SelectedRows['FilledAbs']==True]['abstract'].tolist()
+    #Abstracts=SelectedRows[SelectedRows['FilledAbs']==True]
+
+    #print(Abstracts.loc[0,'abstract'])
+
+    #print(Abstracts.head()['abstract'])
     #cnt = Counter()
     Matches=[]
-
-    for i in range(len(df)):
+    for Abstract in Abstracts:
+        '''
         TitleKeyWords=df.loc[i,'Title Qualifier Words']
         if isinstance(TitleKeyWords,float):continue
         ViralID=df.loc[i,'Viral Tag']
@@ -148,13 +179,14 @@ def TopicKeywordAbstractSearch(KeywordsinTopic,nlp,minRank):####Use pyTextRank
         if not "COVID19" in ViralID:continue
 
         Titles=df.loc[i,'title']
-        Abstract=df.loc[i,'abstract']
-        if Abstract=="null" or isinstance(Abstract,float):continue
-
+        '''
+        #Abstract=Abstracts.loc[i,'abstract']
+        #print(Abstract)
         phrases=TextRank(Abstract,nlp)
+
         #print(phrases)
         #### parse it into phrases
-        for kw in KeywordsinTopic:
+        for kw in KeywordsinTopic:### Check if abstract phrase contains a keyword
             for p in phrases:
                 if kw in p.text and p.rank>minRank:
                     cleantext=clean_up_spacy(p.text,nlp)
@@ -174,11 +206,11 @@ def FillSciKitText(doc,my_stop_words):
             #print(w.lemma_)
             article.append(w.lemma_)
 
-            if w.text == '\n':
+            #if w.text == '\n':
                 #print("here after \n")
-                if(article==[]):continue
-                texts.append(article)
-                skl_texts.append(' '.join(article))
+    if(article!=[]):#continue
+        texts.append(article)
+        skl_texts.append(' '.join(article))
     #skl_texts=list(set(skl_texts))#### Only unique entries
     return skl_texts,texts
 def CreateLDATopics(skl_texts,no_features,no_topics):
@@ -196,7 +228,7 @@ def CreateLDATopics(skl_texts,no_features,no_topics):
     return lda,tf_feature_names
 def CreateNMFTopics(skl_texts,no_features,no_topics):
     #######TFIDF vectorizer and NMF SciTopics############
-    tfidf_vectorizer = TfidfVectorizer(max_features=no_features,ngram_range=(2,3))
+    tfidf_vectorizer = TfidfVectorizer(max_features=no_features,ngram_range=(2,3))##### Set MinDF and MaxDF
     tfidf = tfidf_vectorizer.fit_transform(skl_texts)
     tfidf_feature_names = tfidf_vectorizer.get_feature_names()
     nmf = NMF(n_components=no_topics, random_state=1,beta_loss='kullback-leibler', solver='mu', max_iter=1000, alpha=.1,l1_ratio=.5).fit(tfidf)
@@ -267,37 +299,49 @@ def BuildTopics(doLDA,PATH,no_topics,no_top_words,no_features):
 
     #PATH="../CORD-19-research-challenge/"#"%s" %sys.argv[1]
 
-    print("HERE")
+    print("Building Topics")
+    ############# This part can be sped up
+    df=pd.read_csv('ProcessedCSV/TestLatestData.csv', low_memory=False)
+    df.loc[df['Viral Tag'].str.contains("COVID19"), 'Covid Paper Tag'] = True
+    df.loc[df['who_covidence_id'].notnull(), 'Covid Paper Tag'] = True
+    df.loc[df['Covid Paper Tag'].isnull(),'Covid Paper Tag']=False
+    df.loc[df['Title Qualifier Words'].isnull(),'Covid Paper Tag']=False
 
-    f=open("TitlewordbagTotal.txt",'w');
-    df=pd.read_csv('ProcessedCSV/AnalyzedTitlesAbstract.csv', low_memory=False)
+    SelectedRows=df[df['Covid Paper Tag']==True]
+    #SelectedRows=SelectedRows.head(1000)
+    ListOfTitleWords=SelectedRows['Title Qualifier Words'].tolist()    #
     ###For testing words to look for:
     TestWords=[' study',' ace2',' receptor',' expression',' single',' human',' domain',' cell',' bind',' infection',' protein',' cause',' descriptive',' immune',' clinical',' analysis',' case',' center',' epidemic', ' epidemiological']
     #TestWords=[' vaccine ',' ace2 ',' ship ',' healthcare ',' policy ',' policies ', ' intensive ',' potential ',' quarantine ',' pneumonia ']
+    '''
     for i in range(len(df)):
         TitleQualifiers=df.loc[i,'Title Qualifier Words']
         ViralID=df.loc[i,'Viral Tag']
-        #WHOCOV=df.loc[i,'who_covidence_id']
+        WHOCOV=df.loc[i,'who_covidence_id']
         if TitleQualifiers=="null" or isinstance(TitleQualifiers,float):continue
         #if isinstance(WHOCOV,float): print(TitleQualifiers)
 
-#        if not ("COVID19" in ViralID or not isinstance(WHOCOV,float))  :continue
-        if not "COVID19" in ViralID   :continue
+        if not ("COVID19" in ViralID or not isinstance(WHOCOV,float))  :continue
+        #if not "COVID19" in ViralID   :continue
         #Writeout=False
         #for test in TestWords:
             #if(test in TitleQualifiers ):
         Writeout=True;
         #print(TitleQualifiers)
         #break;
-        if Writeout:f.write(TitleQualifiers+'\n')
+        if Writeout:f.write(TitleQualifiers+'\n ')
+    '''
+    #print(len(ListOfTitleWords),ListOfTitleWords[1922])
 
-
-    f.close()
-    f=open("TitlewordbagTotal.txt",'r');
-    f.seek(0)
-    text=f.read();
-
-    doc = nlp(text.lower())
+    Writeout=True;
+    if Writeout:
+        f=open("TitlewordbagTotal.txt",'w');
+        lines="\n".join(ListOfTitleWords)
+        f.write(lines)
+        f.close()
+    #f=open("TitlewordbagTotal.txt",'r');
+    #f.seek(0)
+    ##### Make this an nlp pipeline instead for the list
     my_stop_words = ['novel','preprint','copyright','medrxiv','author','peer','holder','et_al','cov', '\\ncov', '2019', 'ncov', 'sars', 'covid', 'coronavirus','hcov','19','2019','2019-ncov','covid-19','covid-','cov','title','human','pneumonia']
     my_stop_words.append('wuhan')
     my_stop_words.append('china')
@@ -306,9 +350,16 @@ def BuildTopics(doLDA,PATH,no_topics,no_top_words,no_features):
     my_stop_words.append('acute')
     my_stop_words.append('syndrome')
     my_stop_words.append('datum')
-
-    skl_texts,texts=FillSciKitText(doc,my_stop_words)
-
+    #text="\n".join(ListOfTitleWords); ##### Just a really long bow string
+    #################  No need to go from .txt back to a text string
+    docs = list(nlp.pipe(ListOfTitleWords))#### Matching based on Title and abstract
+    skl_texts=[]
+    for doc in docs:
+    #doc = nlp(text.lower())#####This will break if List above is way too long
+        print(doc.text)
+        tempskl_texts,texts=FillSciKitText(doc,my_stop_words)
+        skl_texts.extend(tempskl_texts)
+    len(skl_texts)
 
     print("\nTopics in NMF model (generalized Kullback-Leibler divergence):")
     nmf,tfidf_feature_names=CreateNMFTopics(skl_texts,no_features,no_topics)
@@ -326,15 +377,15 @@ def BuildTopics(doLDA,PATH,no_topics,no_top_words,no_features):
 
         #if i is not 19:continue
         TestKeyWords=GetTopicWords(nmf,tfidf_feature_names,i,no_top_words); #### About vaccines and drug interventions
-        MatchedPhrases=TopicKeywordAbstractSearch(TestKeyWords,nlp,0.04)
+        MatchedPhrases=TopicKeywordAbstractSearch(TestKeyWords,nlp,0.04,SelectedRows)
         #print(MatchedPhrases)
         nlpsci=InitSciSpacy();
         docs = list(nlpsci.pipe(MatchedPhrases))
 
         matcher = Matcher(nlpsci.vocab)
         for doc in docs:AddSpacyMatchPatterns(nlpsci,doc,matcher,"KeyPhrasesTopic%d"%i)
-        MatchedText=TopicKeywordSearch(MatchedPhrases,nlpsci,matcher,i)
 
+        MatchedText=TopicKeywordSearch(MatchedPhrases,nlpsci,matcher,i,SelectedRows[['pmc_json_files','pdf_json_files']])
 def CoherenceScan(PATH,no_top_words,no_features):
         nlp = InitNLPPyTextRank();
         #no_features = 2000
@@ -345,7 +396,7 @@ def CoherenceScan(PATH,no_top_words,no_features):
         print("HERE")
 
         f=open("TitlewordbagTotal.txt",'w');
-        df=pd.read_csv('ProcessedCSV/AnalyzedTitlesAbstract.csv', low_memory=False)
+        df=pd.read_csv('ProcessedCSV/TestLatestData.csv', low_memory=False)
         ###For testing words to look for:
         TestWords=[' study',' ace2',' receptor',' expression',' single',' human',' domain',' cell',' bind',' infection',' protein',' cause',' descriptive',' immune',' clinical',' analysis',' case',' center',' epidemic', ' epidemiological']
         #TestWords=[' vaccine ',' ace2 ',' ship ',' healthcare ',' policy ',' policies ', ' intensive ',' potential ',' quarantine ',' pneumonia ']
@@ -394,4 +445,4 @@ def RunTopicBuilding():
 
     #CoherenceScan(PATH,no_top_words,no_features)
     BuildTopics(False,PATH,no_topics,no_top_words,no_features)
-#RunTopicBuilding()
+RunTopicBuilding()

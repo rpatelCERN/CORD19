@@ -1,6 +1,7 @@
 #import spacy
 #import pytextrank
 import pandas as pd
+
 import re
 import csv
 from InitNLP import *
@@ -102,17 +103,30 @@ nlp = InitNLPRake(StopWords);
 
 #nlp=InitSciSpacy();
 covid19_synonyms=["COVID","SARS-CoV-2","2019-nCoV","coronavirus disease","novel coronavirus","ncov coronavirus","wuhan coronavirus"]###First three based on my inital guess, the rest found with 2nd step using pyTextRank from all the found titles in a wordbag
+df['title'].fillna("title", inplace=True)
+df['abstract'].fillna("abstract", inplace=True)
+
+#df.loc[df['title'].notnull(), 'TitleFilled'] = True
+#df.loc[df['title'].isnull(), 'TitleFilled'] = False
+#df.loc[df['abstract'].isnull(), 'TitleFilled'] = False
+#SelectedRows=df[df['TitleFilled']==True]
+ListOfTitleWords=df['title'].tolist()    #
+ListOfAbstractWords=df['abstract'].tolist()    #
+FullListTitleAbs=ListOfTitleWords
+#FullListTitleAbs = [i +" " + j for i, j in zip(ListOfTitleWords, ListOfAbstractWords)]
+print(len(FullListTitleAbs),len(df))
+'''
 for i in range(len(df)):
     title=df.loc[i,'title']
     pubtime=df.loc[i,'publish_time']
-
     abstracttext=df.loc[i,'abstract']
-    if title=="null" or isinstance(title,float):
-        title="title";
-
+    if title=="null" or isinstance(title,float):title="title";
     #print(title,pubtime)
     AllTitles.append(title)
-docs = list(nlpsci.pipe(AllTitles))
+'''
+    #### Also store all abstracts to look for COVID19 match patterns
+
+docs = list(nlpsci.pipe(FullListTitleAbs))#### Matching based on Title and abstract, this part takes a lot of time
 for doc in docs:
     #print(doc.text)
     matches=matcher(doc)
@@ -136,7 +150,7 @@ for doc in docs:
     #else:
     #    Titlequalifiers.append("NULL")
 
-print(i,len(ViralMatch))
+print(len(ViralMatch))
 #FILL CSV with Keywords found per paper
 df.insert(8, "Title Qualifier Words", Titlequalifiers, True);
 df.insert(9, "Viral Tag", ViralMatch, True);
