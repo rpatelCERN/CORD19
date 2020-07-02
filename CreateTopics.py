@@ -4,8 +4,10 @@ import spacy
 from spacy import displacy
 from gensim.corpora import Dictionary
 from gensim.models import LdaModel
-
-#import matplotlib.pyplot as plt
+import seaborn as sns
+import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+import matplotlib
 import sklearn
 #import keras
 import pandas as pd
@@ -15,6 +17,8 @@ import pyLDAvis.gensim
 import sklearn
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from sklearn.decomposition import NMF, LatentDirichletAllocation
+from sklearn.manifold import TSNE
+
 import pyLDAvis.sklearn
 import warnings
 
@@ -23,21 +27,92 @@ from spacy.matcher import Matcher
 
 from matplotlib import pyplot as plt
 import seaborn as sns
-from sklearn.manifold import TSNE  ####Just to look at potential topic clusters
+#from sklearn.manifold import TSNE  ####Just to look at potential topic clusters
 
 import os
 import sys
 from PreProcessingText import clean_up_spacy
-
-
 from JSONInputsBodyText import *
 
 warnings.filterwarnings('ignore')  # Let's not pay heed to them right now
 PATH="../../551982_1190426_bundle_archive/"
 
-#nlp = spacy.load("en")
+matplotlib.rc('font',family='monospace')
+plt.style.use('ggplot')
 
-def display_topics(model, feature_names, no_top_words,topicIndex,writeout=False):
+#nlp = spacy.load("en")
+def GetCountFrequency(skl_texts,no_most_frequent):
+    tf_vectorizer = CountVectorizer(max_features=600,ngram_range=(2,3))
+    tf = tf_vectorizer.fit_transform(skl_texts)
+    features = tf_vectorizer.get_feature_names()
+    print(len(features),tf.shape)
+    #d=tf.toarray().sum(axis=0)
+    #d = pd.Series(tf.toarray().flatten(),index = features).sort_values(ascending=False)
+    d = pd.Series(tf.toarray().sum(axis=0),index = features).sort_values(ascending=False)
+    ax = d[:no_most_frequent].plot(kind='bar', figsize=(10,6), width=.8, fontsize=14, rot=45,title='MostFrequent Word Counts')
+    ax.title.set_size(18)
+    plt.show()
+    print(d[:no_most_frequent])
+    return d
+'''
+def GetTFIDFScores(skl_texts,no_most_frequent):
+    tf_vectorizer = CountVectorizer()
+    tf = tf_vectorizer.fit_transform(skl_texts)
+    features = count_vectorizer.get_feature_names()
+    d = pd.Series(tf.toarray().flatten(),
+              index = features).sort_values(ascending=False)
+    ax = d[:no_most_frequent].plot(kind='bar', figsize=(10,6), width=.8, fontsize=14, rot=45,
+            title='MostFrequent Word Counts')
+    ax.title.set_size(18)
+    return d
+'''
+def tSNEPlot(nmf,tfidf,no_topics):
+    nmf_embedding = nmf.transform(tfidf)
+    nmf_embedding = (nmf_embedding - nmf_embedding.mean(axis=0))/nmf_embedding.std(axis=0)
+    tsne = TSNE(random_state=3211)
+    tsne_embedding = tsne.fit_transform(nmf_embedding)
+    tsne_embedding = pd.DataFrame(tsne_embedding,columns=['x','y'])
+    tsne_embedding['hue'] = nmf_embedding.argmax(axis=1)
+    #data = tsne_embedding[df['year']<=year]
+    #for i in range(no_topics):
+    data = tsne_embedding
+    fig, ax = plt.subplots()
+    print(data.head())
+    scatter=ax.scatter(data=data,x='x',y='y',s=no_topics,c=data['hue'],cmap="tab20")
+    legend1 = ax.legend(*scatter.legend_elements(num=no_topics),loc="upper left", title="Topics",ncol=5)
+    #print(scatter.legend_elements())
+    ax.add_artist(legend1)
+    plt.show()
+
+    '''
+    for i in range(0):
+        data = tsne_embedding[data['hue']==i]
+        print(data.head())
+        #fig, axs = plt.subplots(3,2, figsize=(10, 15), facecolor='w', edgecolor='k')
+        scatter=plt.scatter(data=data,x='x',y='y',s=5,c=data['hue'],cmap="Set1")
+        plt.show()
+    #for i in range(no_topics):legend_list.append("Topic %d" %i)
+    colors = []
+    legend_list = []
+    topics=[]
+
+    for i in range(no_topics):
+        topics.append(i)
+        idx = np.where(data['hue']==i)[0][0]
+        color = scatter.get_facecolors()[idx]
+        colors.append(color)
+        legend_list.append(mpatches.Ellipse((0, 0), 1, 1, fc=color))
+
+    print(colors)
+    ax.legend(legend_list,topics,loc=(0.1,0.89),ncol=3)
+    plt.subplots_adjust(top=0.85)
+    '''
+def TitlesInTopic(tfidf,toptitles,):
+    nmf_embedding = nmf.transform(tfidf)
+    nmf_embedding = (nmf_embedding - nmf_embedding.mean(axis=0))/nmf_embedding.std(axis=0)
+    top_idx = np.argsort(nmf_embedding,axis=0)[-toptitles:]
+
+def display_topics(model, feature_names, no_top_words,topicIndex=0,writeout=False):
     for topic_idx, topic in enumerate(model.components_):
         print("Topic %d:" % (topic_idx))
         print(", ".join([feature_names[i]
@@ -88,6 +163,7 @@ def TopicKeywordSearch(KeywordsinTopic,nlp,matcher,topicnumber,SelectedRows):
     AllPapers.loc[AllPapers['pmc_json_files'].notnull(),'Full PMC']=True
     AllPapers.loc[AllPapers['pdf_json_files'].notnull(),'Full PDF']=True
     '''
+
     SelectedRows.loc[SelectedRows['pmc_json_files'].notnull(),'Full PMC']=True
     SelectedRows.loc[SelectedRows['pdf_json_files'].notnull(),'Full PDF']=True
     SelectedRows.loc[SelectedRows['pmc_json_files'].notnull(),'Full PDF']=False#### look at PMC if both PMC and PDF are available
@@ -170,6 +246,9 @@ def TopicKeywordAbstractSearch(KeywordsinTopic,nlp,minRank,SelectedRows):####Use
     #print(Abstracts.head()['abstract'])
     #cnt = Counter()
     Matches=[]
+    rank=[]
+    frequency=[]
+    phrase=[]
     for Abstract in Abstracts:
         '''
         TitleKeyWords=df.loc[i,'Title Qualifier Words']
@@ -188,10 +267,18 @@ def TopicKeywordAbstractSearch(KeywordsinTopic,nlp,minRank,SelectedRows):####Use
         #### parse it into phrases
         for kw in KeywordsinTopic:### Check if abstract phrase contains a keyword
             for p in phrases:
+                rank.append(p.rank)
+                frequency.append(p.count)
+                phrase.append(p.text)
                 if kw in p.text and p.rank>minRank:
                     cleantext=clean_up_spacy(p.text,nlp)
                     #print(kw,p.text,p.rank)
                     Matches.append(cleantext)
+    #mapofWords={'rank':rank,'frequency':frequency, 'text':phrase}
+    #outputDF=pd.DataFrame(mapofWords)
+    #ax=sns.scatterplot(x="rank", y="frequency", data=outputDF)
+    #ax.set(yscale="log")
+    #plt.show()
     return list(set(Matches));
         #print(Matches)
 def FillSciKitText(doc,my_stop_words):
@@ -232,7 +319,7 @@ def CreateNMFTopics(skl_texts,no_features,no_topics):
     tfidf = tfidf_vectorizer.fit_transform(skl_texts)
     tfidf_feature_names = tfidf_vectorizer.get_feature_names()
     nmf = NMF(n_components=no_topics, random_state=1,beta_loss='kullback-leibler', solver='mu', max_iter=1000, alpha=.1,l1_ratio=.5).fit(tfidf)
-    return nmf,tfidf_feature_names
+    return nmf,tfidf_feature_names,tfidf
 #######Implement the sklearn version of this
 def compute_coherence_values( skl_texts,texts,no_features, limit, start=2, step=3):
     """
@@ -301,15 +388,58 @@ def BuildTopics(doLDA,PATH,no_topics,no_top_words,no_features):
 
     print("Building Topics")
     ############# This part can be sped up
-    df=pd.read_csv('ProcessedCSV/TestLatestData.csv', low_memory=False)
+
+    df=pd.read_csv('%s'%sys.argv[1], low_memory=False)
+    #df2=pd.read_csv('%s'%sys.argv[2], low_memory=False)
+    #df = pd.concat([df,df2])
+    #df=pd.read_csv('ProcessedCSV/TestLatestData.csv', low_memory=False)
+    '''
     df.loc[df['Viral Tag'].str.contains("COVID19"), 'Covid Paper Tag'] = True
     df.loc[df['who_covidence_id'].notnull(), 'Covid Paper Tag'] = True
     df.loc[df['Covid Paper Tag'].isnull(),'Covid Paper Tag']=False
     df.loc[df['Title Qualifier Words'].isnull(),'Covid Paper Tag']=False
+    '''
 
-    SelectedRows=df[df['Covid Paper Tag']==True]
+    df.loc[df['Viral Tag'].notnull(),'Paper Tag']=False
+    df.loc[df['Viral Tag'].str.contains("SARS2003"),'Paper Tag']=True
+    #df.loc[df['Viral Tag'].str.contains("HIV"),'Paper Tag']=True
+
+
+
+    #df.loc[df['Viral Tag'].str.contains("Flu"),'Paper Tag']=False
+    #df.loc[df['Viral Tag'].str.contains("BirdFlu"),'Paper Tag']=False
+    #df.loc[df['Viral Tag'].str.contains("CommonCold"),'Paper Tag']=False
+    #df.loc[df['Viral Tag'].str.contains("MS"),'Paper Tag']=True
+    #df.loc[df['Viral Tag'].str.contains("Hep"),'Paper Tag']=True
+
+    #df.loc[df['Viral Tag'].str.contains("\[\]"),'Paper Tag']=True
+    #df.loc[df['Viral Tag'].str.contains("IBV"),'Paper Tag']=True
+    #df.loc[df['Viral Tag'].str.contains("VGastroEntritis"),'Paper Tag']=True
+    #df.loc[df['Viral Tag'].str.contains("ZoonoticCorona"),'Paper Tag']=True
+    #df.loc[df['Viral Tag'].str.contains("CoronaUnclassified"),'Paper Tag']=True
+    #df.loc[df['Viral Tag'].str.contains("HumanCorona"),'Paper Tag']=True
+    #df.loc[df['Viral Tag'].str.contains("ARDS"),'Paper Tag']=True
+    #df.loc[df['Viral Tag'].str.contains("Asthma"),'Paper Tag']=True
+    #df.loc[df['Viral Tag'].str.contains("Pneumonia")& df['Viral Tag'].str.contains("Flu"),'Paper Tag']=True
+    #df.loc[df['Viral Tag'].str.contains("Pneumonia"),'Paper Tag']=True
+    '''
+    df.loc[df['Viral Tag'].notnull(),'Paper Tag']=False
+    df.loc[df['Viral Tag'].str.contains("Hep"),'Paper Tag']=False
+    df.loc[df['Viral Tag'].str.contains("MS"),'Paper Tag']=False
+    df.loc[df['Viral Tag'].str.contains("Flu"),'Paper Tag']=False
+    df.loc[df['Viral Tag'].str.contains("HumanCorona"),'Paper Tag']=True
+    df.loc[df['Viral Tag'].str.contains("ZoonoticCorona"),'Paper Tag']=True
+    df.loc[df['Viral Tag'].str.contains("VGastroEntritis"),'Paper Tag']=True
+    df.loc[df['Viral Tag'].str.contains("IBV"),'Paper Tag']=True
+    '''
+    #print(df['Paper Tag'].head())
+
+    SelectedRows=df[df['Paper Tag']==True];
+    #SelectedRows=df[df['Covid Paper Tag']==True]
     #SelectedRows=SelectedRows.head(1000)
-    ListOfTitleWords=SelectedRows['Title Qualifier Words'].tolist()    #
+    ListOfTitleWords=SelectedRows['Title Qualifier Words'].tolist()
+
+    #print(ListOfTitleWords)    #
     ###For testing words to look for:
     TestWords=[' study',' ace2',' receptor',' expression',' single',' human',' domain',' cell',' bind',' infection',' protein',' cause',' descriptive',' immune',' clinical',' analysis',' case',' center',' epidemic', ' epidemiological']
     #TestWords=[' vaccine ',' ace2 ',' ship ',' healthcare ',' policy ',' policies ', ' intensive ',' potential ',' quarantine ',' pneumonia ']
@@ -333,7 +463,7 @@ def BuildTopics(doLDA,PATH,no_topics,no_top_words,no_features):
     '''
     #print(len(ListOfTitleWords),ListOfTitleWords[1922])
 
-    Writeout=True;
+    Writeout=False;
     if Writeout:
         f=open("TitlewordbagTotal.txt",'w');
         lines="\n".join(ListOfTitleWords)
@@ -342,27 +472,46 @@ def BuildTopics(doLDA,PATH,no_topics,no_top_words,no_features):
     #f=open("TitlewordbagTotal.txt",'r');
     #f.seek(0)
     ##### Make this an nlp pipeline instead for the list
-    my_stop_words = ['novel','preprint','copyright','medrxiv','author','peer','holder','et_al','cov', '\\ncov', '2019', 'ncov', 'sars', 'covid', 'coronavirus','hcov','19','2019','2019-ncov','covid-19','covid-','cov','title','human','pneumonia']
+    my_stop_words = ['preprint','copyright','medrxiv','author','peer','holder','et_al','cov', '\\ncov', '2019', 'ncov', 'sars', 'covid','hcov','19','2019','2019-ncov','covid-19','covid-','cov','title']
+    '''
+    my_stop_words.append('novel')
     my_stop_words.append('wuhan')
     my_stop_words.append('china')
     my_stop_words.append('disease')
     my_stop_words.append('outbreak')
     my_stop_words.append('acute')
     my_stop_words.append('syndrome')
+    '''
     my_stop_words.append('datum')
+    my_stop_words.append('abstract')
+    my_stop_words.append('title')
+    my_stop_words.append('result')
+    my_stop_words.append('suggest')
+
     #text="\n".join(ListOfTitleWords); ##### Just a really long bow string
     #################  No need to go from .txt back to a text string
     docs = list(nlp.pipe(ListOfTitleWords))#### Matching based on Title and abstract
     skl_texts=[]
     for doc in docs:
     #doc = nlp(text.lower())#####This will break if List above is way too long
-        print(doc.text)
+        #print(doc.text)
         tempskl_texts,texts=FillSciKitText(doc,my_stop_words)
         skl_texts.extend(tempskl_texts)
-    len(skl_texts)
-
+    #GetCountFrequency(skl_texts,50)
+    #skl_texts = skl_texts[0:100]
+    print(len(skl_texts),len(ListOfTitleWords),len(df['title']))
     print("\nTopics in NMF model (generalized Kullback-Leibler divergence):")
-    nmf,tfidf_feature_names=CreateNMFTopics(skl_texts,no_features,no_topics)
+    nmf,tfidf_feature_names,tfidf=CreateNMFTopics(skl_texts,no_features,no_topics)
+    nmf_embedding = nmf.transform(tfidf)
+    nmf_embedding = (nmf_embedding - nmf_embedding.mean(axis=0))/nmf_embedding.std(axis=0)
+    top_idx = np.argsort(nmf_embedding,axis=0)[-10:]
+    count=0
+    for idxs in top_idx.T:
+        print("\nTopic {}:".format(count))
+
+        for idx in idxs:
+            print(SelectedRows.iloc[idx]['title']+","+SelectedRows.iloc[idx]['publish_time'])
+        count += 1
     #print("done in %0.3fs." % (time() - t0))
     #print(tfidf_feature_names)
     if doLDA: #Do LDA:
@@ -371,14 +520,18 @@ def BuildTopics(doLDA,PATH,no_topics,no_top_words,no_features):
         display_topics(lda, tf_feature_names, no_top_words)
         #print("done in %0.3fs." % (time() - t0))
     #### HERE MAKE A LOOP over topics
-    for i in range(no_topics):
+    #for i in range(no_topics):
         #if i is not 2:continue
-        display_topics(nmf, tfidf_feature_names, no_top_words,i,True)
-
-        #if i is not 19:continue
+    display_topics(nmf, tfidf_feature_names, no_top_words)
+    #tSNEPlot(nmf,tfidf,no_topics)
+    for i in range(6,no_topics):
+        #if i!=7:continue
+        display_topics(nmf, tfidf_feature_names, no_top_words,i, True)
+        print("Topic %d" %i)
         TestKeyWords=GetTopicWords(nmf,tfidf_feature_names,i,no_top_words); #### About vaccines and drug interventions
         MatchedPhrases=TopicKeywordAbstractSearch(TestKeyWords,nlp,0.04,SelectedRows)
-        #print(MatchedPhrases)
+        #
+        print(MatchedPhrases)
         nlpsci=InitSciSpacy();
         docs = list(nlpsci.pipe(MatchedPhrases))
 
@@ -432,6 +585,7 @@ def CoherenceScan(PATH,no_top_words,no_features):
         my_stop_words.append('acute')
         my_stop_words.append('syndrome')
         my_stop_words.append('datum')
+        my_stop_words.append('abstract')
 
         skl_texts,texts=FillSciKitText(doc,my_stop_words)
         texts=[]
@@ -439,10 +593,13 @@ def CoherenceScan(PATH,no_top_words,no_features):
         model_list,coherence_values=compute_coherence_values(skl_texts,texts,no_features, 15, start=2, step=1)
         print(coherence_values)
 def RunTopicBuilding():
-    no_topics=20
-    no_top_words=20
-    no_features=600
-
+    #no_topics=10
+    no_topics=30
+    #no_topics=20
+    no_top_words=10
+    #no_top_words=20
+    no_features=1900
+    #no_features=600
     #CoherenceScan(PATH,no_top_words,no_features)
     BuildTopics(False,PATH,no_topics,no_top_words,no_features)
 RunTopicBuilding()
