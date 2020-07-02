@@ -1,4 +1,4 @@
-sudo apt-get update
+sudo yum check-update
 
 sudo yum install python3
 
