@@ -63,7 +63,7 @@ def AddSpacyMatchTokens(nlp):
     matcher.add("PorcineRRVirus", None, PRRS)
 
     PCR=[{"LOWER":"reverse","OP":"?"},{"LOWER":"transcription","OP":"?"},{"IS_PUNCT": True,"OP":"?"},{"LOWER":"polymerase"}, {"LOWER":"chain"},{"LOWER":"reaction"}]
-    matcher.add("PorcineRRVirus", None, PCR)
+    matcher.add("PCR", None, PCR)
     ACE=[{"LOWER":"angiotensin", "OP":"?"}, {"LOWER":"convert"}, {"LOWER":"enzyme"}]
     ACE2=[{"LOWER":"ace2"}]
     matcher.add("ACE",None,ACE)
@@ -75,9 +75,6 @@ def AddSpacyMatchTokens(nlp):
 
     MonoAnti=[{"LOWER":"monolocal"},{"LEMMA":"antibodies"}]
     matcher.add("MonoAnti",None,MonoAnti)
-
-
-
     return matcher
 
 
@@ -173,7 +170,6 @@ def RakeTitleAbstract(df,Cutoff,YearBegin,YearEnd):
         if(NRanked>Cutoff):Titlephrases=Titlephrases[0:Cutoff]
         if(len(Titlephrases)>0):Titlephrases=clean_up_spacy(' '.join(Titlephrases),nlpsci);
         Titlequalifiers.append(Titlephrases)###Filled Per Title
-
 
     #FILL CSV with Keywords found per paper
     df.insert(8, "Title Qualifier Words", Titlequalifiers, True);

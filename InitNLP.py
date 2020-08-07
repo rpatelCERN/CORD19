@@ -2,7 +2,7 @@ import spacy
 import scispacy
 import en_core_sci_sm
 import pytextrank
-from rake_nltk import Rake
+from rake_nltk import Rake,Metric
 
 def InitNLPPyTextRank():
     nlpPyRank = spacy.load("en_core_web_sm")
@@ -16,9 +16,16 @@ def InitSciSpacy():
     return nlp;
 
 
-def InitNLPRake(StopWords):
-    nlp=Rake(StopWords);
+def InitNLPRake():
+    nlp=Rake(ranking_metric=Metric.DEGREE_TO_FREQUENCY_RATIO,max_length=6)
+    #nlp=Rake(StopWords);
     return nlp
+
+def TextRankPIPE(texts,nlp):
+ docs = nlp.pipe(texts)
+ rankedphrases=[]
+ for doc in docs:rankedphrases.extend(doc._.phrases)
+ return rankedphrases
 
 def TextRank(text,nlp):
  doc = nlp(text)
