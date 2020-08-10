@@ -2,13 +2,20 @@ import pandas as pd
 
 from fuzzywuzzy import fuzz
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
-
+import matplotlib
 from matplotlib import pyplot as plt
 import seaborn as sns
 import sys
 from TitlePhraseRanking import AddSpacyMatchTokens
 from InitNLP import *
 from spacy.matcher import Matcher
+
+matplotlib.rc('font',family='monospace')
+plt.style.use('ggplot')
+
+fig, ax = plt.subplots()
+plt.xlabel("Keywords")
+plt.ylabel("Count Freq.")
 
 def testMatches(nlp,keywordlist):
     matchtokens=AddSpacyMatchTokens(nlp);
@@ -47,6 +54,8 @@ def GetCountFrequency(skl_texts,no_most_frequent,dictForCleaning={}):
     ax.title.set_size(18)
     #ax.set_autoscale(True)
     #plt.update_xaxes(automargin=True)
+    plt.xlabel("Keywords")
+    plt.ylabel("Count Freq.")
     plt.show()
     print(d[:no_most_frequent])
     return d

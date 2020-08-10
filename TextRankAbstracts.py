@@ -82,6 +82,8 @@ def AbstractRankedPhrases(KeywordsinTopic,nlp,minRank,maxcount,highrank,highcoun
     outputDF=pd.DataFrame(mapofWords)
     ax=sns.scatterplot(x="kwtextrank", y="frequencykw", data=outputDF,label="Matched phrases to topic words")
     ax2=sns.kdeplot(outputDF.kwtextrank,label='KDE matched phrases')#, y="frequencykw", data=outputDF,cmap="Reds", shade=True, shade_lowest=False)
+    plt.xlabel("PyText Rank Score")
+    plt.ylabel("Count Freq.")
     plt.show()
     return list(set(Matches)),list(set(PassingMatches));
 

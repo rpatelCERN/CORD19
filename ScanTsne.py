@@ -40,6 +40,7 @@ def ScanNTopics(skl_texts,TopicScan,perplexity):
     no_top_words=10
     no_features=30000
     for t in TopicScan:
+        #print(skl_texts)
         nmf,tfidf=BuildNTopics(skl_texts,no_features,no_top_words,t)
         tSNEPlot(nmf,tfidf,t,perplexity,True)
     animation = camera.animate(blit=True,interval=1000,repeat_delay=15000)

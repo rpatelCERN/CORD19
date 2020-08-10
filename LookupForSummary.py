@@ -2,7 +2,8 @@ import pandas as pd
 import re
 ####Look up functions
 def SORTbyRank(fbase,topicnumber,toprank):
-    df=pd.read_csv('%s.csv_Topic%d.csv' %(fbase,topicnumber), low_memory=True,memory_map=True)
+    #df=pd.read_csv('%s.csv_Topic%d.csv' %(fbase,topicnumber), low_memory=True,memory_map=True)
+    df=pd.read_csv('%s_Topic%d.csv' %(fbase,topicnumber), low_memory=True,memory_map=True)
     df.sort_values(by=['Rankscore'],inplace=True,ascending=False)
     #print(df.head(toprank))
     return df
@@ -19,7 +20,7 @@ def LookUpText(fbase,matchtext,topicnumber):
     matchtext=matchtext.replace('~','')
     matchtext=matchtext.replace('=','')
     '''
-    
+
     matchtext=re.sub(r"[^a-zA-Z\d\_]+", "", matchtext)
     #print(matchtext)
     df["matched_lines"]=df["matched_lines"].str.replace(r"[^a-zA-Z\d\_]+", "")
@@ -49,7 +50,7 @@ def LookUpText(fbase,matchtext,topicnumber):
         #MatchExp=MatchExp[0:1]###Match 1/3 the sentences
         for m in MatchExp:
             matchtext=m
-            
+
             matchtext=matchtext.replace('\n','')
             matchtext=matchtext.replace('(','')
             matchtext=matchtext.replace(')','')
@@ -57,7 +58,7 @@ def LookUpText(fbase,matchtext,topicnumber):
             matchtext=matchtext.replace(']','')
             matchtext=matchtext.replace('~','')
             matchtext=matchtext.replace('=','')
-            
+
             print(m.strip())
             df=df[df['matched_lines'].str.contains(matchtext.strip(),regex=True)]
     '''
@@ -76,7 +77,7 @@ def TopicLabeling(fbase, dictLabels):
     df["topic"].replace(dictLabels, inplace=True)
     return df;
 
-def WriteOutSummary(fbase,no_topics,toprank):
+def WriteOutSummary(fbase,no_topics,toprank,dictLabels):
     fout=open('FullSummary%s.md' %(fbase),'w')
     fout.write("#%s" %fbase)
 
@@ -90,11 +91,16 @@ def WriteOutSummary(fbase,no_topics,toprank):
         URL=LookUpURLFromTitle(titles,fbase);
         df.insert(len(df.columns),'url',URL)
         RankedDocs=df.to_string(columns=['Rankscore','title','url'])
-        fout.write("## Topic %d Most Similar Documents \n" %i)
+        fout.write("## Topic %s Most Similar Documents" %dictLabels[i])
+        fout.write('\n')
         fout.write(RankedDocs)
+        fout.write('\n')
+
         #print(df.to_string(columns=['Rankscore','title','URL']).split('\n'))
         del df;
-        fout.write("## Topic %d Long Summary \n" %i)
+        fout.write("## Topic %s Long Summary" %dictLabels[i])
+        fout.write('\n')
+
         f=open("%sTopicSummary%d.txt" %(fbase,i))
         paragraphs=f.readlines();
         countlines=1
@@ -105,12 +111,14 @@ def WriteOutSummary(fbase,no_topics,toprank):
                 #print(line)
                 dfMatch=LookUpText(fbase,line,i)
                 #print(dfMatch.head())
-                fout.write("[%s](%s) \n" %(dfMatch['title'].values[0],dfMatch['url'].values[0]))
+                URLFirst=dfMatch['url']
+                if(";" in URLFirst):URLFirst=URLFirst.split(";")[0]
+                fout.write("[%s](%s)" %(dfMatch['title'].values[0],dfMatch['url'].values[0]))
                 fout.write(line +'\n')
                 del dfMatch
                 countlines=countlines+1
                 if countlines>toprank:break
         f.close()
     fout.close()
-    
-WriteOutSummary("COVID19andACE", 15,10)
+
+#WriteOutSummary("COVID19andACE", 15,5)
