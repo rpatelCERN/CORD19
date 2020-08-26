@@ -97,3 +97,27 @@ python CORDCrusher.py -m RakedKeywords -Y 2019 2021
 This produces a histogram as seen below that can be used to eyeball key topics (like public health) and make sure the topic word is included in the NMF topics, to find stop words that could be removed due to high frequency like (sars cov), and check how well the NGrams are cleaned up (like in the above example). 
 
 ![CountVectorizerHistogram](CountVectorizerOutput.png)
+
+The key step for creating summaries is choosing the number of topics and the minimum pyTextRank score to cut out. 
+
+Choosing the number of topics is based on looking at a 2D projection of the input keywords. I use t-distributed stochastic neighbor embedding (t-SNE) to project from word space to a 2D plane of topics. This method is well suited to NMF topic analysis. It first learns the probability distribution from pairs of higher dimensional word phrases, then in the lower dimensional plane it creates a probability distribution to minimizes the Kullback–Leibler divergence  for clusters of points. The result is a 2D map of points that shows clumps that correspond to a given topic. 
+
+It is useful to see how the t-SNE scatter plot changes for different number of topics and at which point including more topics does not result in more tight clusters. The plot below is generated with the following command: 
+
+```
+python CORDCrusher.py -m TopicScan --TopicScan 2 4 8 10 15 20 25 30 --Era SARS2002to2005  -o TestScan
+```
+The method TopicScan runs NMF several times for the a set of topics (e.g. 2 4 8 10 15 20 25 30) and a given Era (the example is for the SARS outbreak). The gif shows an animation of the t-SNE projection for each number of topics. Up to 10 topics are needed in order to see some coherence, and with 30 topics the clusters are tight and more isolated from one another.
+
+![t-SNE Example Plot](TestScan.gif)
+
+The minimum pyTextRank is investigated by looking at the abstracts for all documents with matched topic words. Comparing all the phrases from pyTextRank and the phrases with matched topic words shows that low pyTextRank scores have a range where the topic words are not very dominant and high scores (rarer phrases that are highly relevant) are whre the topic words are important in the abstract.  
+An example command is as follows:
+```
+python CORDCrusher.py -m PhraseRanking --pyTextRank 0.0 --Era SARS2005to2012PublicHealth  --topics 20 -Y 2005 2012
+```
+The above method creates a scatter plot of points for the two cases: all the phrases with one mention of topic words in the abstract and only phrases with a matched topic word. The lines show the probability distribution function for the two cases based on Kernal Density estimation. The lines cross at 0.17 where the probability of unmatched phrases is equal to the phrases containing topic words. Requiring phrases with matched topic words to have a value greated 0.17 for the rank score removes less important phrases that often are not so relevant in the abstract and can have a large matching frequency in documents
+
+![PyTextRankExamplePlot](PyTextRankExample.png)
+
+
