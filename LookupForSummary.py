@@ -11,57 +11,12 @@ def SORTbyRank(fbase,topicnumber,toprank):
 def LookUpText(fbase,matchtext,topicnumber):
     df=pd.read_csv('%s.csv' %(fbase), low_memory=True,memory_map=True)
     df=df[df['topic']==topicnumber]
-    '''
-    matchtext=matchtext.replace('\n','')
-    matchtext=matchtext.replace('(','')
-    matchtext=matchtext.replace(')','')
-    matchtext=matchtext.replace('[','')
-    matchtext=matchtext.replace(']','')
-    matchtext=matchtext.replace('~','')
-    matchtext=matchtext.replace('=','')
-    '''
 
     matchtext=re.sub(r"[^a-zA-Z\d\_]+", "", matchtext)
     #print(matchtext)
     df["matched_lines"]=df["matched_lines"].str.replace(r"[^a-zA-Z\d\_]+", "")
-    '''
-    df["matched_lines"]=df["matched_lines"].str.replace('\\n','')
-    df["matched_lines"]=df["matched_lines"].str.replace('\(','')
-    df["matched_lines"]=df["matched_lines"].str.replace('\)','')
-    df["matched_lines"]=df["matched_lines"].str.replace('\[','')
-    df["matched_lines"]=df["matched_lines"].str.replace('\]','')
-    df["matched_lines"]=df["matched_lines"].str.replace('~','')
-    df["matched_lines"]=df["matched_lines"].str.replace('=','')
-    '''
     df=df[df['matched_lines'].str.contains(matchtext,regex=True)]
-    '''
-    if df.empty:
-        df=pd.read_csv('%s.csv' %(fbase), low_memory=True,memory_map=True)
-        df=df[df['topic']==topicnumber]
-        df["matched_lines"]=df["matched_lines"].str.replace('\\n','')
-        df["matched_lines"]=df["matched_lines"].str.replace('\(','')
-        df["matched_lines"]=df["matched_lines"].str.replace('\)','')
-        df["matched_lines"]=df["matched_lines"].str.replace('\[','')
-        df["matched_lines"]=df["matched_lines"].str.replace('\]','')
-        df["matched_lines"]=df["matched_lines"].str.replace('~','')
-        df["matched_lines"]=df["matched_lines"].str.replace('=','')
-        MatchExp=matchtext.split("...")
-        MatchExp=MatchExp[0:int(len(MatchExp)/2)]###Match 1/2 the sentences
-        #MatchExp=MatchExp[0:1]###Match 1/3 the sentences
-        for m in MatchExp:
-            matchtext=m
 
-            matchtext=matchtext.replace('\n','')
-            matchtext=matchtext.replace('(','')
-            matchtext=matchtext.replace(')','')
-            matchtext=matchtext.replace('[','')
-            matchtext=matchtext.replace(']','')
-            matchtext=matchtext.replace('~','')
-            matchtext=matchtext.replace('=','')
-
-            print(m.strip())
-            df=df[df['matched_lines'].str.contains(matchtext.strip(),regex=True)]
-    '''
     return df
 
 def LookUpURLFromTitle(titles,fbase):
@@ -79,7 +34,7 @@ def TopicLabeling(fbase, dictLabels):
 
 def WriteOutSummary(fbase,no_topics,toprank,dictLabels):
     fout=open('FullSummary%s.md' %(fbase),'w')
-    fout.write("#%s" %fbase)
+    fout.write("# %s\n" %fbase)
 
     for i in range(no_topics):
     #for i in range(12,13):
@@ -88,16 +43,28 @@ def WriteOutSummary(fbase,no_topics,toprank,dictLabels):
         df=df.head(toprank)
         df.reset_index(drop=True, inplace=True)
         titles=df['title'].tolist()
+        Ranks=df['Rankscore'].tolist()
         URL=LookUpURLFromTitle(titles,fbase);
-        df.insert(len(df.columns),'url',URL)
-        RankedDocs=df.to_string(columns=['Rankscore','title','url'])
-        fout.write("## Topic %s Most Similar Documents" %dictLabels[i])
+        del df;
+
+        #df.insert(len(df.columns),'url',URL)
+        #RankedDocs=df.to_string(columns=['Rankscore','title','url'])
+        fout.write("## Topic %s: Topic words \n" %dictLabels[i])
         fout.write('\n')
-        fout.write(RankedDocs)
+        ftopics=open("TopicWords%s_%d.txt" %(fbase,i),'r')
+        fout.write(ftopics.read()+'\n')
+        ftopics.close()
+        fout.write("## Topic %s Most Similar Documents \n" %dictLabels[i])
+        fout.write('\n')
+
+        fout.write('TF-IDF Score | Title | Link to Doc \n')
+        fout.write('------------ | ------------- | -------------\n')
+        for j in range(len(titles)):
+            fout.write(" %.4f| %s | %s \n" %(Ranks[j],titles[j],URL[j]))
+        #fout.write(RankedDocs)
         fout.write('\n')
 
         #print(df.to_string(columns=['Rankscore','title','URL']).split('\n'))
-        del df;
         fout.write("## Topic %s Long Summary" %dictLabels[i])
         fout.write('\n')
 
@@ -111,14 +78,39 @@ def WriteOutSummary(fbase,no_topics,toprank,dictLabels):
                 #print(line)
                 dfMatch=LookUpText(fbase,line,i)
                 #print(dfMatch.head())
-                URLFirst=dfMatch['url']
+                URLFirst=dfMatch['url'].values[0]
                 if(";" in URLFirst):URLFirst=URLFirst.split(";")[0]
-                fout.write("[%s](%s)" %(dfMatch['title'].values[0],dfMatch['url'].values[0]))
-                fout.write(line +'\n')
+                #print(URLFirst)
+                fout.write("[%s](%s)" %(dfMatch['title'].values[0],URLFirst) +'\n')
+                fout.write("> "+line +'\n')
                 del dfMatch
                 countlines=countlines+1
                 if countlines>toprank:break
         f.close()
+        fout.write("## Topic %s Short Summary" %dictLabels[i])
+        fout.write('\n')
+        f=open("%sShortNotes%d.txt" %(fbase,i),'r')
+        paragraphs=f.readlines();
+        countlines=1
+        for line in paragraphs:
+            ####Stray characters
+            #if line=='\n':continue
+            print(len(line))
+            if(len(line)>30):### Remove stray characters and fragments
+                #print(line)
+                print(line)
+                dfMatch=LookUpText(fbase,line,i)
+                print(dfMatch.head())
+                URLFirst=dfMatch['url'].values[0]
+                if(";" in URLFirst):URLFirst=URLFirst.split(";")[0]
+                print(URLFirst)
+                fout.write("[%s](%s)" %(dfMatch['title'].values[0],URLFirst) +'\n')
+                fout.write("> "+line +'\n')
+                del dfMatch
+                countlines=countlines+1
+                if countlines>toprank:break
+        f.close()
+        #LookUpText()
     fout.close()
 
 #WriteOutSummary("COVID19andACE", 15,5)

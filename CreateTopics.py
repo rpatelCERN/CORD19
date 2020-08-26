@@ -312,5 +312,5 @@ def RunTopicBuilding(df,PATH,SetTrue,SetFalse,no_topics,outputDFname,stopwords,p
 
     SelectedRows=SelectDFRows(df,SetTrue,SetFalse)#df[df['Paper_Tag']==True];
     del df;
-
+    #print(PATH)
     BuildTopics(PATH,stopwords,SelectedRows,no_topics,no_top_words,no_features,outputDFname,pytextrank)

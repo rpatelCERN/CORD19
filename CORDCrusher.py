@@ -24,6 +24,8 @@ parser.add_argument("--topRanked", dest="topRanked", default='5', help="Num of T
 
 parser.add_argument("--pyTextRank", dest="pyTextRank", default='0.02', help="Minimal pyTextRank Score for Abstrct matching", metavar="pyTextRank",type=float)
 
+parser.add_argument("--TopicLabels", nargs='+', default=[])
+
 args = parser.parse_args()
 
 PATH=args.path
@@ -72,7 +74,7 @@ SetTrue=[]
 SetFalse=[]
 perplexity=150
 
-fcsv="ProcessedCSV/AnalyzedTitles2020to2021.csv"
+fcsv="ProcessedCSV/AnalyzedTitles2019to2021.csv"
 if args.Era=="HumanDiseases1970to1990" or args.Era=="Zoonotic1970to1990":
     perplexity=50
     fcsv="ProcessedCSV/AnalyzedTitles1970to1990.csv"
@@ -82,10 +84,10 @@ if args.Era=="HumanDiseases1990to2002" or args.Era=="Zoonotic1990to2002":
 if args.Era=="SARS2002to2005":
     perplexity=50
     fcsv="ProcessedCSV/AnalyzedTitles2002to2005.csv"
-if args.Era=="SARS2005to2012":
+if "SARS2005to2012" in args.Era:
     perplexity=100
     fcsv="ProcessedCSV/AnalyzedTitles2005to2012.csv"
-if args.Era=="MERS":
+if "MERS" in args.Era and not "COVID19" in args.Era:
     perplexity=100
     fcsv="ProcessedCSV/AnalyzedTitles2012to2019.csv"
 
@@ -104,27 +106,35 @@ if args.Era=="Zoonotic1970to1990" or args.Era=="Zoonotic1990to2002":
     SetTrue.extend(GenesProteinsAntibodies)
     SetTrue.extend(LabTests)
     SetFalse=[]
-
+if args.Era=="Zoonotic1990to2002":
+    SetTrue=["ZoonoticCorona","CoronaUnclassified"]
+    SetFalse=["HumanCorona"]
 if args.Era=="SARS2002to2005" or "SARS2005to2012" in args.Era:
     #perplexity=200
     SetTrue=["SARS2003"]
     SetFalse=[]
-
     stop_words.append('acute')
     stop_words.append('syndrome')
+    stop_words.append('respiratory')
     stop_words.append('severe')
     stop_words.append('sars')
     stop_words.append('cov')
-if args.Era=="MERS":
+
+if "MERS" in args.Era:
     #perplexity=200
     SetTrue=["MERS"]
     SetFalse=[]
+    stop_words.append('acute')
+    stop_words.append('syndrome')
+    stop_words.append('respiratory')
+    stop_words.append('severe')
+    stop_words.append('sars')
+    stop_words.append('cov')
     stop_words.append('mers')
     stop_words.append('middle')
     stop_words.append('east')
-    stop_words.append('reserved')
-    stop_words.append('novel')
     stop_words.append('coronavirus')
+
 if "COVID19" in args.Era:
     #perplexity=400
     #fcsv="ProcessedCSV/AnalyzedTitles2020to2021.csv"
@@ -159,21 +169,33 @@ if("TopicScan" in args.mode or "CreateTopics" in args.mode ):
     df=pd.read_csv(fcsv, low_memory=True,memory_map=True)
     outputDFname=args.output
     if args.Era=="SARS2002to2005" or "SARS2005to2012" in args.Era:
-
-        if "PublicHealth" in args.Era:df=df[df['Viral Tag'].str.contains("PublicHealth") & df['Viral Tag'].str.contains("SARS2003")]
+        if "PublicHealth" in args.Era:df=df[df['Viral Tag'].str.contains("PublicHealth") |df['Viral Tag'].str.contains("MitigationMeasures")]
         if "Misc" in args.Era:df=df[~(df['Viral Tag'].str.contains("PublicHealth") & df['Viral Tag'].str.contains("SARS2003"))]
-
-    if args.Era=="MERS":
-        if "PublicHealth" in args.Era:df=df[df['Viral Tag'].str.contains("PublicHealth") & df['Viral Tag'].str.contains("MERS")]
-        if "Misc" in args.Era:df=df[~(df['Viral Tag'].str.contains("PublicHealth") & df['Viral Tag'].str.contains("MERS"))]
+    if "MERS" in args.Era:
+        if "PublicHealth" in args.Era:
+            SetFalse.append("WNileV")
+            SetFalse.append("HIV")
+            SetFalse.append("BirdFlu")
+            SetFalse.append("HEP")
+            SetFalse.append("zika")
+            SetFalse.append("Ebola")
+            df=df[df['Viral Tag'].str.contains("PublicHealth") ]
+        if "Misc" in args.Era:
+            df=df[df['Viral Tag'].str.contains("MERS")]
+            df=df[~(df['Viral Tag'].str.contains("PublicHealth") & df['Viral Tag'].str.contains("MERS"))]
+            SetTrue.extend(GenesProteinsAntibodies)
+            SetTrue.extend(LabTests)
+            SetTrue.append("ZoonoticCorona")
     if "COVID19" in args.Era:
         df=SelectDFRows(df,SetTrue,SetFalse)
         if "PublicHealth" in args.Era:
             stop_words.append('public')
             df=df[df['Viral Tag'].str.contains("PublicHealth")|df['Viral Tag'].str.contains("MitigationMeasures")|df['Viral Tag'].str.contains("ICU")]
         if "ACE" in args.Era:df=df[df['Viral Tag'].str.contains("ACE")]
+        #if "Misc" in args.Era:df=df[df['Viral Tag'].str.contains("CoronaUnclassified") | df['Viral Tag'].str.contains("Pneumonia")| df['Viral Tag'].str.contains("ARDS")]
         if "Zoo" in args.Era:df=df[ df['Viral Tag'].str.contains("ZoonoticCorona")]
-        if "MERS" in args.Era and "SARS" in args.Era:df=df[df['Viral Tag'].str.contains("SARS2003") | df['Viral Tag'].str.contains("MERS")]
+        if "Misc" in args.Era:df=df[ ~(df['Viral Tag'].str.contains("ACE") | df['Viral Tag'].str.contains("SARS2003") | df['Viral Tag'].str.contains("MERS") | df['Viral Tag'].str.contains("ZoonoticCorona") | df['Viral Tag'].str.contains("PublicHealth")|df['Viral Tag'].str.contains("MitigationMeasures")|df['Viral Tag'].str.contains("ICU"))]
+        if "MERS" in args.Era and "SARS" in args.Era:df=df[df['Viral Tag'].str.contains("SARS2003") & df['Viral Tag'].str.contains("MERS")]
     if"TopicScan" in args.mode:RunTopicScans(df,SetTrue,SetFalse,stop_words,Topics,fout,perplexity)
     if"CreateTopics" in args.mode:RunTopicBuilding(df,PATH,SetTrue,SetFalse,no_topics,outputDFname,stop_words,args.pyTextRank)
 
@@ -196,140 +218,9 @@ if "PhraseRanking" in args.mode:
 if "CreateSummaries" in args.mode:
     for i in range(args.topics):RunSummaries(PATH,args.Era+".csv",i)
 if "WriteSummaries"in args.mode:
-    dictLabels={0:"Coronaviridae family", 1:"respiratory syncytial virus",2:"Human Cov 229E",3:"Viral Genome",4:"Electron Microscopy",5:"Transmissible Gastroenteritis Virus",6:"Human Cov  OC43",7:"Diagnosis of Viral Infections"}
+    dictLabels={}
+    LabelsList=args.TopicLabels
+    for t in range(len(LabelsList)):dictLabels[t]=LabelsList[t]
+    print(dictLabels)
+    #dictLabels={0:"Coronaviridae family", 1:"respiratory syncytial virus",2:"Human Cov 229E",3:"Viral Genome",4:"Electron Microscopy",5:"Transmissible Gastroenteritis Virus",6:"Human Cov  OC43",7:"Diagnosis of Viral Infections"}
     WriteOutSummary(args.Era, args.topics,args.topRanked,dictLabels)
-
-#if("CreateTopics" in args.mode):
-
-#if("CreateSummaries" in args.mode):
-
-#if("WriteSummaries" in args.mode):
-
-#### Modes: time slices, optimization, rake titles, plottsne, create topics, visualizations
-'''
-PATH="551982_1312270_bundle_archive/" ### Pass this also as an argument
-#### Also give it the the dataframe and the list of tags to set to true and the set to false
-#### pass list of stop words
-
-
-
-
-
-df=pd.read_csv('%s'%sys.argv[1], low_memory=True,memory_map=True)#### Pass as an option along with the mode
-#### General stop words
-
-
-#####SARS2003 and MERS
-stop_words.append('acute')
-stop_words.append('syndrome')
-stop_words.append('severe')
-stop_words.append('respiratory')
-stop_words.append('sars')
-stop_words.append('cov')
-
-######MERS only
-stop_words.append('mers')
-stop_words.append('middle')
-stop_words.append('east')
-stop_words.append('coronavirus')
-######COVID19
-stop_words.append('reserved')
-stop_words.append('novel')
-
-
-###########Mode for 1970to1980 studies on Human diseases
-SetTrue=[]
-SetTrue.extend(NonCoronaDiseases)
-SetTrue.extend(GenesProteinsAntibodies)
-SetTrue.extend(PublicHealth)
-SetTrue.extend(LabTests)
-SetTrue.extend(GenesProteinsAntibodies)
-SetTrue.append("HumanCorona")
-#SetTrue.append("CoronaUnclassified")
-SetFalse=[]#### If the above passes then analyze the category
-
-outputDFname="HumanDiseases1990to2002"
-no_topics=15
-'''
-#RunTopicBuilding(df,PATH,SetTrue,SetFalse,no_topics,outputDFname,stop_words)
-#
-#fname="celluloid_tsneTopicsHumanDiseases1990.gif"
-#RunTopicScans(df,SetTrue,SetFalse,stop_words,TopicScan,fname,20)### also include perplexity
-
-#SetTrue=["ZoonoticCorona","CoronaUnclassified"]#ZoonoticAll
-#SetTrue=ZooCorona
-#SetTrue.extend(GenesProteinsAntibodies)
-#SetTrue.extend(LabTests)
-#SetFalse=[]
-#SetFalse.append("HumanCorona")
-#SetFalse.extend(NonCoronaDiseases)
-#SetFalse.extend(PublicHealth)
-#print(SetTrue)
-#outputDFname="Zoonotic1990to2002"
-
-#no_topics=20
-#fname="celluloid_tsneTopicsMerged1990.gif"
-#TopicScan=[5,10,15,20]
-#RunTopicScans(df,SetTrue,SetFalse,stop_words,TopicScan,fname,150)### also include perplexity
-#RunTopicBuilding(df,PATH,SetTrue,SetFalse,no_topics,outputDFname,stop_words)
-
-
-#no_topics=15
-#SetTrue=["COVID19"]
-#SetTrue.extend(GenesProteinsAntibodies)
-#SetTrue.extend(PublicHealth)
-#SetTrue.extend(LabTests)
-#SetFalse=PublicHealth### Already accounted for
-#SetFalse=[]
-
-#SetFalse.append("WNileV")
-#SetFalse.append("HIV")
-#SetFalse.append("BirdFlu")
-#SetFalse.append("HEP")
-#SetFalse.append("zika")
-#SetFalse.append("Ebola")
-
-#outputDFname="COVID19andACE"
-#df=df[(df['Viral Tag'].str.contains("COVID19"))] #& df['Viral Tag'].str.contains("ACE"))]
-#df=df[df['Viral Tag'].str.contains("CoronaUnclassified") | df['Viral Tag'].str.contains("Pneumonia")| df['Viral Tag'].str.contains("ARDS")]
-#df=df[df['Viral Tag'].str.contains("SARS2003") | df['Viral Tag'].str.contains("MERS")]
-#df=df[df['Viral Tag'].str.contains("ACE")]
-#df=df[df['Viral Tag'].str.contains("PublicHealth")|df['Viral Tag'].str.contains("MitigationMeasures")|df['Viral Tag'].str.contains("ICU")]
-
-#SetFalse.extend(PublicHealth)
-#TopicScan=[5,10,15,20,30]
-#fname="celluloid_tsneTopicsCOVID19.gif"
-#RunTopicScans(df,SetTrue,SetFalse,stop_words,TopicScan,fname,50)
-#RunTopicBuilding(df,PATH,SetTrue,SetFalse,no_topics,outputDFname,stop_words)
-
-'''
-#This would be a mode for running the abstract optimization
-SelectedRows=SelectDFRows(df,SetTrue,SetFalse)
-AllTopicKeyWords=[]
-for i in range(no_topics):
-    f=open("TopicWords%s_%d.txt" %(outputDFname,i),'r')
-    f.seek(0)
-    #print("TopicWords%s_%d.txt" %(outputDFname,i))
-    #print(f.read().split(','))
-    TopicWords=f.read().split(',')
-    print(TopicWords)
-    #
-    AllTopicKeyWords.extend(TopicWords)
-    f.close()
-print(AllTopicKeyWords)
-AbstractRankOptimization(stop_words,SelectedRows,AllTopicKeyWords,0.02)
-'''
-
-
-'''
-no_topics=40
-SetTrue=["MERS"]
-SetTrue.extend(GenesProteinsAntibodies)
-SetTrue.extend(PublicHealth)
-SetTrue.extend(LabTests)
-SetTrue.extend(GenesProteinsAntibodies)
-SetFalse=[]
-
-outputDFname="MERS2012"
-RunTopicBuilding(df,PATH,SetTrue,SetFalse,no_topics,outputDFname,stop_words)
-'''

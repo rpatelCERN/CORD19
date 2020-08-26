@@ -15,7 +15,7 @@ from PreProcessingText import *
 #FILEPATH="551982_1312270_bundle_archive/"
 
 def SkimallText(filepath,nlp):
-    filename="551982_1312270_bundle_archive/"+filepath
+    filename=filepath
     BodyText=[]
     for i in range(0,Nlines_in_paper(filename)):
         LineSentence=line_in_paper(filename,i)
@@ -80,7 +80,7 @@ def DocumentSimalarity(Filepath,CSVFILE,Topic):
         for p in pub:
             #p=p.replace(" ","")
             print(p)
-            SkimmedText=SkimallText(p,nlpsci)
+            SkimmedText=SkimallText(Filepath+p,nlpsci)
             if len(SkimmedText)==0:continue
             BodyText.extend(SkimmedText)####Full text not just the abstract
         Doc=".".join(BodyText)
