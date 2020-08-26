@@ -20,6 +20,8 @@ The CORD dataset is a large chunk of machine readable publications that date fro
 
 This code attempts to do this by creating a set of topics for a given time slice (for more dense spans of time we also divide them into sub-topics), finding the most similar documents in each topic, and creating extractive summaries for the topic. These are included in the wiki for the repository.
 
+The full extractive summaries for all topics found is included in the [wiki](https://github.com/rpatelCERN/CORD19/wiki/CORD19-Summaries) and contains an abstractive summary authored by me.
+
 # NLP and Visualization Python Packages
 The setup shell file consists of all necessary python packages for running the code.  I will highlight a few key packages that form the backbone of the code as well as useful packages for visualization. 
 
