@@ -20,7 +20,21 @@ The CORD dataset is a large chunk of machine readable publications that date fro
 
 This code attempts to do this by creating a set of topics for a given time slice (for more dense spans of time we also divide them into sub-topics), finding the most similar documents in each topic, and creating extractive summaries for the topic. These are included in the wiki for the repository.
 
+# NLP and Visualization Python Packages
+The setup shell file consists of all necessary python packages for running the code.  I will highlight a few key packages that form the backbone of the code as well as useful packages for visualization. 
 
+* [Spacy](https://spacy.io/usage) and also (SciSpacy)[https://allenai.github.io/scispacy/] is used to perform tokenization, recognize parts of speech, pattern and phrase match, and also clean up stop words. 
+* [RAKE](https://pypi.org/project/rake-nltk/}) or Rapid Automatic Keyword Extraction algorithm is used as a fairly general and also rapid keyword extraction tool for the first stage of the algorithm (Layer 1 ) to quickly extract keywords from the title and abstract
+* [Fuzzy string matching](https://pypi.org/project/fuzzywuzzy/) uses the Levenshtein Distance between sequences of tokens to decide if they are synonms. Some examples include (reading frame and open reading frame, gastroentritis and transmissble gastroentritis virus). My convention is to always keep the longer N-gram (longer sequence of words)
+* [NMF](https://scikit-learn.org/stable/modules/generated/sklearn.decomposition.NMF.html) or Non-Negative Matrix factorization is an unsupervised learning algorithm similar to Latent Dirichlet Allocation but converges more rapidly using a more advanced minimization technique. In this process, a document-term matrix is constructed with the weights of various terms from a set of documents. This matrix is factored into a term-feature and a feature-document matrix. The features are derived from the contents of the documents, and the feature-document matrix describes data clusters of related documents. A detailed description can be found here: [Fast Local Algorithms for Large Scale Nonnegative Matrix and Tensor Factorizations](https://www.researchgate.net/publication/220241471_Fast_Local_Algorithms_for_Large_Scale_Nonnegative_Matrix_and_Tensor_Factorizations)
+* The document features are represented using [Term-Frequency Inverse Document Frequency](https://scikit-learn.org/stable/modules/generated/sklearn.feature_extraction.text.TfidfVectorizer.html) matrices. The matrix is fit and transformed to create document clusters using NMF. Rare words (with a small document frequency) that are not frequent across all documents are emphasized more with a larger TFIDF score. Cosine similarity between TFIDF vectors is used to create summaries for each topic. [Count Vectorizer](https://scikit-learn.org/stable/modules/generated/sklearn.feature_extraction.text.CountVectorizer.html) is similar but consists only of a matrix of token counts, these vectors are used to create a histogram of word counts
+*  [PyTextRank](https://pypi.org/project/pytextrank/) is used for a more advanced but slower recognition of key phrases that contain the topic words. Cutting off the rank score removes more general phrases that would blow up the size of the text summaries.
+* [T-distributed Stochastic Neighbor Embedding](https://scikit-learn.org/stable/modules/generated/sklearn.manifold.TSNE.html) is a tool for visualizing the topics by projecting the higher dimensional document space onto a 2D plane.  It converts similarities between data points to joint probabilities and tries to minimize the Kullback-Leibler divergence between the joint probabilities of the low-dimensional embedding and the high-dimensional data. This in effect clusters points that have similarity and pushes away dissimilar clusters. This algorithm is used to visualize topic clusters. A key tunable parameter in the algo is the [perplexity](https://distill.pub/2016/misread-tsne/) and in general it should scale with the number of features.
+* [celluloid](https://pypi.org/project/celluloid/) provides gif animations from matlibplot. I use it to step though tSNE plots that scan over different number of topics. This shows visualizes how many topics might be necessary for a given time slice.
+
+```	
+bash setup.sh 
+```
 
 # CORD Crusher Main Executable
 
@@ -68,22 +82,18 @@ python CORDCrusher.py -m WriteSummaries --Era COVID19andSPublicHealth --topics N
 Full Example for output: 
 
 ```
-python CORDCrusher.py -m WriteSummaries --topics 5 --TopicLabels "seafood wholesale market" "Phylogenetic analyses" "Porcine epidemic diarreah virus" "ACE2 receptor similarity to bat/pangolin" "antiviral drugs" --Era COVID19andZoo -o COVID19andZoo
+python CORDCrusher.py -m WriteSummaries --Era COVID19andZoo -o COVID19andZoo --topRanked 5 --topics 5 --TopicLabels "seafood wholesale market" "Phylogenetic analyses" "Porcine epidemic diarreah virus" "ACE2 receptor similarity to bat/pangolin" "antiviral drugs" 
 ```
+This produces the summary (aside from the part that is written by me after reading it) [here](https://github.com/rpatelCERN/CORD19/wiki/COVID-19-Initial-Outbreak-and-Zoonotic-Origin-investigations)
 
-## NLP and Visualization Python Packages
-The setup shell file consists of all necessary python packages for running the code.  I will highlight a few key packages that form the backbone of the code as well as useful packages for visualization. 
+## Supporting Code for Investigations
 
-* [Spacy](https://spacy.io/usage) and also (SciSpacy)[https://allenai.github.io/scispacy/] is used to perform tokenization, recognize parts of speech, pattern and phrase match, and also clean up stop words. 
-* [RAKE](https://pypi.org/project/rake-nltk/}) or Rapid Automatic Keyword Extraction algorithm is used as a fairly general and also rapid keyword extraction tool for the first stage of the algorithm (Layer 1 ) to quickly extract keywords from the title and abstract
-* [Fuzzy string matching](https://pypi.org/project/fuzzywuzzy/) uses the Levenshtein Distance between sequences of tokens to decide if they are synonms. Some examples include (reading frame and open reading frame, gastroentritis and transmissble gastroentritis virus). My convention is to always keep the longer N-gram (longer sequence of words)
-* [NMF](https://scikit-learn.org/stable/modules/generated/sklearn.decomposition.NMF.html) or Non-Negative Matrix factorization is an unsupervised learning algorithm similar to Latent Dirichlet Allocation but converges more rapidly using a more advanced minimization technique. In this process, a document-term matrix is constructed with the weights of various terms from a set of documents. This matrix is factored into a term-feature and a feature-document matrix. The features are derived from the contents of the documents, and the feature-document matrix describes data clusters of related documents. A detailed description can be found here: [Fast Local Algorithms for Large Scale Nonnegative Matrix and Tensor Factorizations](https://www.researchgate.net/publication/220241471_Fast_Local_Algorithms_for_Large_Scale_Nonnegative_Matrix_and_Tensor_Factorizations)
-* The document features are represented using [Term-Frequency Inverse Document Frequency](https://scikit-learn.org/stable/modules/generated/sklearn.feature_extraction.text.TfidfVectorizer.html) matrices. The matrix is fit and transformed to create document clusters using NMF. Rare words (with a small document frequency) that are not frequent across all documents are emphasized more with a larger TFIDF score. Cosine similarity between TFIDF vectors is used to create summaries for each topic. [Count Vectorizer](https://scikit-learn.org/stable/modules/generated/sklearn.feature_extraction.text.CountVectorizer.html) is similar but consists only of a matrix of token counts, these vectors are used to create a histogram of word counts
-*  [PyTextRank](https://pypi.org/project/pytextrank/) is used for a more advanced but slower recognition of key phrases that contain the topic words. Cutting off the rank score removes more general phrases that would blow up the size of the text summaries.
-* [T-distributed Stochastic Neighbor Embedding](https://scikit-learn.org/stable/modules/generated/sklearn.manifold.TSNE.html) is a tool for visualizing the topics by projecting the higher dimensional document space onto a 2D plane.  It converts similarities between data points to joint probabilities and tries to minimize the Kullback-Leibler divergence between the joint probabilities of the low-dimensional embedding and the high-dimensional data. This in effect clusters points that have similarity and pushes away dissimilar clusters. This algorithm is used to visualize topic clusters. A key tunable parameter in the algo is the [perplexity](https://distill.pub/2016/misread-tsne/) and in general it should scale with the number of features.
-* [celluloid](https://pypi.org/project/celluloid/) provides gif animations from matlibplot. I use it to step though tSNE plots that scan over different number of topics. This shows visualizes how many topics might be necessary for a given time slice.
+Using Rake for keywords abstraction can be tricky when the keywords are turned into NGrams (sequential words) as there they may be redundant or incomplete NGrams like "world health", "health organization" and "world health organization". The code in BuildNGrams.py builds a dictionary so that NGrams within a fuzzy matching distance are combined, in the above case the counts for "world health" and "health organization" would be added to "world health organization"
 
-```	
-bash setup.sh 
-```	
+The before/after of the NGram output is plotted as a histogram of counts by calling: 
+```
+python CORDCrusher.py -m RakedKeywords -Y 2019 2021
+```
+This produces a histogram as seen below that can be used to eyeball key topics (like public health) and make sure the topic word is included in the NMF topics, to find stop words that could be removed due to high frequency like (sars cov), and check how well the NGrams are cleaned up (like in the above example). 
 
+![CountVectorizerHistogram](CountVectorizerOutput.png)
