@@ -1,81 +1,89 @@
-# CORD19
-CORD-19 Open dataset text mining project:
 
 # CORD-19: COVID-19 Open Research Dataset
 
-## Where's the data?
+"Today, researchers and leaders from the Allen Institute for AI, Chan Zuckerberg Initiative (CZI), Georgetown University’s Center for Security and Emerging Technology (CSET), Microsoft, and the National Library of Medicine (NLM) at the National Institutes of Health released the COVID-19 Open Research Dataset (CORD-19) of scholarly literature about COVID-19, SARS-CoV-2, and the Coronavirus group.
 
-Several locations, I first found it on Kaggle:
+Requested by The White House Office of Science and Technology Policy, the dataset represents the most extensive machine-readable Coronavirus literature collection available for data and text mining to date, with over 29,000 articles, more than 13,000 of which have full text.
 
-https://www.kaggle.com/allen-institute-for-ai/CORD-19-research-challenge
+Now, The White House joins these institutions in issuing a call to action to the Nation’s artificial intelligence experts to develop new text and data mining techniques that can help the science community answer high-priority scientific questions related to COVID-19."
+- [White House Office of Science and Technology Policy](https://www.whitehouse.gov/briefings-statements/call-action-tech-community-new-machine-readable-covid-19-dataset/)
 
-This also has more links to check for updates to the dataset from https://pages.semanticscholar.org/coronavirus-research
+## Downloading the Data
 
-## Overall Goal: 
+Several locations:
+[Kaggle](https://www.kaggle.com/allen-institute-for-ai/CORD-19-research-challenge)
+[Semantic Scholar](https://www.semanticscholar.org/cord19/download)
 
-"We are issuing a call to action to the world's artificial intelligence experts to develop text and data mining tools that can help the medical community develop answers to high priority scientific questions. "
+# Overall Goal: 
 
-The Kaggle excerise itself has 10 main tasks which can be used to map the CORD-19 data onto topics by carefully classifying and scoring key sentences in the publications. The large dataset can then be crushed into an RSS feed on a summary webpage. The whole process should be fast and robust so that new papers can be input to the stream and relevant new information is dessiminated. 
+The CORD dataset is a large chunk of machine readable publications that date from 1870 up until the present (within a few weeks). The dataset consists of a vast number of publications that span a variety of topics including studies on agravated respiratory conditions, international epidemics like Ebola and SARS, and the latest publications on COVID-19. The overall goal is to take this dense web of information and turn it into a comprehensive picture. 
 
-## Additional Goodies from Text Mining
+This code attempts to do this by creating a set of topics for a given time slice (for more dense spans of time we also divide them into sub-topics), finding the most similar documents in each topic, and creating extractive summaries for the topic. These are included in the wiki for the repository.
 
-Hopefully, the same tools can be used to extract features which can be fed into ML diagnostic algorithms like cv19 vulnerability index: 
-https://science-responds.org/projects/ds#cv19_index
 
-## My First Try
 
-The current version of the repository has a more brute force method (counting, tagging and ranking phrases) of mining the data only because this is my first project with any NLP. Also I am biased by many HEP cut and count publications.
-No ML-algos are used thus far because I am still getting my feet wet, but the code in this repository should help other novices like myself use simple NLP libraries to query the dataset. I also include a simple KMeans fit algo to check how the body text lines that match keywords can be mapped onto topics.
+# CORD Crusher Main Executable
 
-For ranking phrases I rely on two main NLP tools: PyTextRank and rake-nltk. 
-Additional information on these can be found here: 
+CORDCrusher.py is the main executable file that calls the set of functions in the NLP pipeline that create keywords, categorizes documents, and summaries the text. Each step is set by the -m option to run a given method.
 
-https://github.com/DerwenAI/pytextrank
+## Creating Summaries
+The first step is to choose a time range of publications to consider,the metadata file is then truncated to contain only publications in the given time frame (in the example below it is 2019 2021). PATHtoMETAData is the full path to the CORD19 data folder that contains the metadata.csv file. The argument -Y accepts a range of years so -Y 2002 2012 2019 2021 would produce three time slices for [2002, 2012] [2012, 2019],[2019, 2021] (the last range is limited to today's date) and creates output csv files as TimeSlicePapersXtoY.csv for range [X,Y]
 
-https://github.com/csurfer/rake-nltk
+```
+python CORDCrusher.py -m TimeSlice --path PATHtoMETAData  -Y 2019 2021
+```
+The next step is to rake keywords in the title and abstract from the timeslice csv files. The options are similar to the above but include a number N which would correspond to the maximum number of keywords to keep by default (N=20). This step also fills in a columns of tags that flag papers based on Spacy match patterns. 
 
-rake is a bit more intuitively understood as a matrix of words/phrases where the diagonal is the frequency and the covariance terms give a measure of how often the word is paired with other words in the covariance matrix. PyTextRank is more commonly used and builds an assocation map using graphs (lemma graphs). 
+```
+ python CORDCrusher.py -m RAKE -Y 2019 2021 --NRaked N
+```
 
-## Getting started
+The step for creating topics runs the NMF topic building algorithm, stores the top 10 topic keywords, stores text lines that match topic words, also stores titles that match the raked keywords used to build the topic. To reduce the size of the files for the matched lines (thus prevent memory use to blow up down stream) we keep lines where the pyTextRank score is larger 0.02 (by default ) or a larger value of 0.04 so that the matched lines can be ranked by TF-IDF scores later. The number of topics to create is defined by setting Ntopics. 
 
-if you don't have these:
+The Era is a predefined set of time slices each of which corresponds to a summary in the twiki, the available options are:
+
+* HumanDiseases1970to1990
+* Zoonotic1970to1990
+* HumanDiseases1990to2002
+* Zoonotic1990to2002
+* SARS2002to2005
+* SARS2005to2012
+* MERS
+* COVID19
+
+Topics can have a specific focus by requiring a tag (based on Spacy Match patterns), an example focus below is public health and looks for papers that have both the COVID19 tag, the PublicHealth tag as well as others that correspond to infection control measures. 
+
+```
+python CORDCrusher.py -m CreateTopics --Era COVID19andSPublicHealth --topics Ntopics  -o COVID19andSPublicHealth --pyTextRank 0.04 -Y 2019 2021 --path PATHtoMETAData
+```
+The above step creates a set of text files that are input for this step which ranks the documents from NMF embeddings, the matched text lines per document, and matched sentences according to the TF-IDF scores. This is the main output for creating the summaries based on the most typical papers, paragraphs and sentences.
+
+```
+python CORDCrusher.py -m CreateSummaries --Era COVID19andSPublicHealth --topics Ntopics  -o COVID19andSPublicHealth 
+```
+The last step is to write out the summaries to a markdown file. Matched lines and title names are reverse matched to find the URL link to the full paper. NRanked specifies how many of the highest TF-IDF items to keep (default is 5) The output markdown file contains the following set of information for the Ntopics: ,a table of the top ranked documents along with their TF-IDF score, a list of paragraphs for the highest scoring matched text lines per paper, and finally the highest scoring matched sentences. The last argument --TopicLabels gives the labels for each topic and if these are unknown you can specify numbers (e.g. for five topics --TopicLabels 0 1 2 3 4 
+```
+python CORDCrusher.py -m WriteSummaries --Era COVID19andSPublicHealth --topics Ntopics --topRanked NRanked -o COVID19andSPublicHealth --TopicLabels Strings Seperated by Spaces
+```
+Full Example for output: 
+
+```
+python CORDCrusher.py -m WriteSummaries --topics 5 --TopicLabels "seafood wholesale market" "Phylogenetic analyses" "Porcine epidemic diarreah virus" "ACE2 receptor similarity to bat/pangolin" "antiviral drugs" --Era COVID19andZoo -o COVID19andZoo
+```
+
+## NLP and Visualization Python Packages
+The setup shell file consists of all necessary python packages for running the code.  I will highlight a few key packages that form the backbone of the code as well as useful packages for visualization. 
+
+* [Spacy](https://spacy.io/usage) and also (SciSpacy)[https://allenai.github.io/scispacy/] is used to perform tokenization, recognize parts of speech, pattern and phrase match, and also clean up stop words. 
+* [RAKE](https://pypi.org/project/rake-nltk/}) or Rapid Automatic Keyword Extraction algorithm is used as a fairly general and also rapid keyword extraction tool for the first stage of the algorithm (Layer 1 ) to quickly extract keywords from the title and abstract
+* [Fuzzy string matching](https://pypi.org/project/fuzzywuzzy/) uses the Levenshtein Distance between sequences of tokens to decide if they are synonms. Some examples include (reading frame and open reading frame, gastroentritis and transmissble gastroentritis virus). My convention is to always keep the longer N-gram (longer sequence of words)
+* [NMF](https://scikit-learn.org/stable/modules/generated/sklearn.decomposition.NMF.html) or Non-Negative Matrix factorization is an unsupervised learning algorithm similar to Latent Dirichlet Allocation but converges more rapidly using a more advanced minimization technique. In this process, a document-term matrix is constructed with the weights of various terms from a set of documents. This matrix is factored into a term-feature and a feature-document matrix. The features are derived from the contents of the documents, and the feature-document matrix describes data clusters of related documents. A detailed description can be found here: [Fast Local Algorithms for Large Scale Nonnegative Matrix and Tensor Factorizations](https://www.researchgate.net/publication/220241471_Fast_Local_Algorithms_for_Large_Scale_Nonnegative_Matrix_and_Tensor_Factorizations)
+* The document features are represented using [Term-Frequency Inverse Document Frequency](https://scikit-learn.org/stable/modules/generated/sklearn.feature_extraction.text.TfidfVectorizer.html) matrices. The matrix is fit and transformed to create document clusters using NMF. Rare words (with a small document frequency) that are not frequent across all documents are emphasized more with a larger TFIDF score. Cosine similarity between TFIDF vectors is used to create summaries for each topic. [Count Vectorizer](https://scikit-learn.org/stable/modules/generated/sklearn.feature_extraction.text.CountVectorizer.html) is similar but consists only of a matrix of token counts, these vectors are used to create a histogram of word counts
+*  [PyTextRank](https://pypi.org/project/pytextrank/) is used for a more advanced but slower recognition of key phrases that contain the topic words. Cutting off the rank score removes more general phrases that would blow up the size of the text summaries.
+* [T-distributed Stochastic Neighbor Embedding](https://scikit-learn.org/stable/modules/generated/sklearn.manifold.TSNE.html) is a tool for visualizing the topics by projecting the higher dimensional document space onto a 2D plane.  It converts similarities between data points to joint probabilities and tries to minimize the Kullback-Leibler divergence between the joint probabilities of the low-dimensional embedding and the high-dimensional data. This in effect clusters points that have similarity and pushes away dissimilar clusters. This algorithm is used to visualize topic clusters. A key tunable parameter in the algo is the [perplexity](https://distill.pub/2016/misread-tsne/) and in general it should scale with the number of features.
+* [celluloid](https://pypi.org/project/celluloid/) provides gif animations from matlibplot. I use it to step though tSNE plots that scan over different number of topics. This shows visualizes how many topics might be necessary for a given time slice.
+
 ```	
-	pip install -U spacy
-# Download best-matching version of specific model for your spaCy installation
-	python -m spacy download en_core_web_sm
-	pip install pytextrank
-	pip install rake-nltk
-```
-Also be sure to grab the latest CORD-19 data from the project areas listed above. The executable scripts should run smoothly in python 3 :
-
-This script takes the metadata.csv file with the title and abstract and uses it to find key phrases in the title, abstract and matches between them. The script also flags which papers are likely about the cov19 epidemic (as opposed to SARS 2003 or MERS from 2012) based on a list of synonyms. You can also pass it a filtered CSV file in the same format if you have made one.
-```
-	python TitlePhraseRanking.py PATH_TO_YOUR CSV file
-```
-This script now contains found phrases in the abstract, title or both. In addition, we can get key words by merging all the abstracts flagged as covid19 in the previous step and rank the phrases in them using pyTextRank (this might take some time to run):
-
-```
-	python AbstractFullTextAnalyze.py
-```
-The output is a wordbag.txt file that is then used to rank phrases based on the "super" abstract, and also a csv file with the phrase, rank, and frequency. These quantities can also be plotted from this script.
-
-The total list of phrases is used to search the papers flagged as cov19 in the first step
-
-```
- 	python SearchPapers.py PATH TO CORD 19 data
-```
-This produces a CSV file of keywords and lines that match those keywords, as well as a wordbag.txt file of all matched lines. Based on the matched lines we can try to build topics for the publications we have used. One way to do this is a KMeans algorithm (maybe not the best way?) and look at 2D projections of the principle features using a PCA (This is still in development) What is tuneable in this script is the number of clusters/topics fit in the algo. 
-
-```
-	python KMeansLearnTopics.py NCLUSTERS
-```
-
-## Wishlist
-Simple Wrapper code that uses the KMean clusters in the first step to start to make a loop from topics back to keywords
-
-Outputs are currently CSV files, but ideally there would be some front end interface for researchers to use as well as a simple "fact sheet" for the general public. So building more of a front-end
-
-For a fast-query tool, the above could be reworked to be an RDS. 
-
-Find key words with an ML approach instead of brute force so that it is both robust and fast.  
+bash setup.sh 
+```	
 
