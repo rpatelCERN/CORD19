@@ -24,15 +24,52 @@ This code attempts to do this by creating a set of topics for a given time slice
 
 # CORD Crusher Main Executable
 
-CORDCrusher.py is the main executable file that calls the set of functions in the NLP pipeline that create keywords, categorizes documents, and summaries the text. 
+CORDCrusher.py is the main executable file that calls the set of functions in the NLP pipeline that create keywords, categorizes documents, and summaries the text. Each step is set by the -m option to run a given method.
 
-
-
-
-```
+## Creating Summaries
+The first step is to choose a time range of publications to consider,the metadata file is then truncated to contain only publications in the given time frame (in the example below it is 2019 2021). PATHtoMETAData is the full path to the CORD19 data folder that contains the metadata.csv file. The argument -Y accepts a range of years so -Y 2002 2012 2019 2021 would produce three time slices for [2002, 2012] [2012, 2019],[2019, 2021] (the last range is limited to today's date) and creates output csv files as TimeSlicePapersXtoY.csv for range [X,Y]
 
 ```
+python CORDCrusher.py -m TimeSlice --path PATHtoMETAData  -Y 2019 2021
+```
+The next step is to rake keywords in the title and abstract from the timeslice csv files. The options are similar to the above but include a number N which would correspond to the maximum number of keywords to keep by default (N=20). This step also fills in a columns of tags that flag papers based on Spacy match patterns. 
 
+```
+ python CORDCrusher.py -m RAKE -Y 2019 2021 --NRaked N
+```
+
+The step for creating topics runs the NMF topic building algorithm, stores the top 10 topic keywords, stores text lines that match topic words, also stores titles that match the raked keywords used to build the topic. To reduce the size of the files for the matched lines (thus prevent memory use to blow up down stream) we keep lines where the pyTextRank score is larger 0.02 (by default ) or a larger value of 0.04 so that the matched lines can be ranked by TF-IDF scores later. The number of topics to create is defined by setting Ntopics. 
+
+The Era is a predefined set of time slices each of which corresponds to a summary in the twiki, the available options are:
+
+* HumanDiseases1970to1990
+* Zoonotic1970to1990
+* HumanDiseases1990to2002
+* Zoonotic1990to2002
+* SARS2002to2005
+* SARS2005to2012
+* MERS
+* COVID19
+
+Topics can have a specific focus by requiring a tag (based on Spacy Match patterns), an example focus below is public health and looks for papers that have both the COVID19 tag, the PublicHealth tag as well as others that correspond to infection control measures. 
+
+```
+python CORDCrusher.py -m CreateTopics --Era COVID19andSPublicHealth --topics Ntopics  -o COVID19andSPublicHealth --pyTextRank 0.04 -Y 2019 2021 --path PATHtoMETAData
+```
+The above step creates a set of text files that are input for this step which ranks the documents from NMF embeddings, the matched text lines per document, and matched sentences according to the TF-IDF scores. This is the main output for creating the summaries based on the most typical papers, paragraphs and sentences.
+
+```
+python CORDCrusher.py -m CreateSummaries --Era COVID19andSPublicHealth --topics Ntopics  -o COVID19andSPublicHealth 
+```
+The last step is to write out the summaries to a markdown file. Matched lines and title names are reverse matched to find the URL link to the full paper. NRanked specifies how many of the highest TF-IDF items to keep (default is 5) The output markdown file contains the following set of information for the Ntopics: ,a table of the top ranked documents along with their TF-IDF score, a list of paragraphs for the highest scoring matched text lines per paper, and finally the highest scoring matched sentences. The last argument --TopicLabels gives the labels for each topic and if these are unknown you can specify numbers (e.g. for five topics --TopicLabels 0 1 2 3 4 
+```
+python CORDCrusher.py -m WriteSummaries --Era COVID19andSPublicHealth --topics Ntopics --topRanked NRanked -o COVID19andSPublicHealth --TopicLabels Strings Seperated by Spaces
+```
+Full Example for output: 
+
+```
+python CORDCrusher.py -m WriteSummaries --topics 5 --TopicLabels "seafood wholesale market" "Phylogenetic analyses" "Porcine epidemic diarreah virus" "ACE2 receptor similarity to bat/pangolin" "antiviral drugs" --Era COVID19andZoo -o COVID19andZoo
+```
 
 ## NLP and Visualization Python Packages
 The setup shell file consists of all necessary python packages for running the code.  I will highlight a few key packages that form the backbone of the code as well as useful packages for visualization. 
