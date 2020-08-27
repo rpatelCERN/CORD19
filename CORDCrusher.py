@@ -159,10 +159,10 @@ if("RakedKeywords" in args.mode):
         df=SelectDFRows(df,SetTrue,SetFalse)
         print(df.head())
         KeyWords=df['Title Qualifier Words'].tolist()
-        CompareNGramCleaning(KeyWords,50,20)
+        CompareNGramCleaning(KeyWords,50,10)
         del df
 
-if("TopicScan" in args.mode or "CreateTopics" in args.mode ):
+if("TopicScan" in args.mode or "CreateTopics" in args.mode or "PhraseRanking" in args.mode  ):
     fout=args.output+".gif"
     Topics=args.TopicScan
     no_topics=args.topics
@@ -198,8 +198,18 @@ if("TopicScan" in args.mode or "CreateTopics" in args.mode ):
         if "MERS" in args.Era and "SARS" in args.Era:df=df[df['Viral Tag'].str.contains("SARS2003") & df['Viral Tag'].str.contains("MERS")]
     if"TopicScan" in args.mode:RunTopicScans(df,SetTrue,SetFalse,stop_words,Topics,fout,perplexity)
     if"CreateTopics" in args.mode:RunTopicBuilding(df,PATH,SetTrue,SetFalse,no_topics,outputDFname,stop_words,args.pyTextRank)
-
-if "PhraseRanking" in args.mode:
+    if "PhraseRanking" in args.mode:
+        AllTopicKeyWords=[]
+        for i in range(no_topics):
+            f=open("TopicWords%s_%d.txt" %(args.Era,i),'r')
+            f.seek(0)
+            TopicWords=f.read().split(',')
+            AllTopicKeyWords.extend(TopicWords)
+            f.close()
+        SelectedRows=SelectDFRows(df,SetTrue,SetFalse)
+        AbstractRankOptimization(stop_words,SelectedRows,AllTopicKeyWords,args.pyTextRank)
+'''
+if  in args.mode:
     YearChunks=args.Years
     no_topics=args.topics
     fbase=args.Era
@@ -207,14 +217,8 @@ if "PhraseRanking" in args.mode:
         dfcsv="ProcessedCSV/AnalyzedTitles%sto%s.csv" %(YearChunks[y],YearChunks[y+1])
         df=pd.read_csv(dfcsv, low_memory=False)
         SelectedRows=SelectDFRows(df,SetTrue,SetFalse)
-        AllTopicKeyWords=[]
-        for i in range(no_topics):
-            f=open("TopicWords%s_%d.txt" %(fbase,i),'r')
-            f.seek(0)
-            TopicWords=f.read().split(',')
-            AllTopicKeyWords.extend(TopicWords)
-            f.close()
-        AbstractRankOptimization(stop_words,SelectedRows,AllTopicKeyWords,args.pyTextRank)
+'''
+
 if "CreateSummaries" in args.mode:
     for i in range(args.topics):RunSummaries(PATH,args.Era+".csv",i)
 if "WriteSummaries"in args.mode:
