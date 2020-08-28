@@ -190,9 +190,13 @@ if("TopicScan" in args.mode or "CreateTopics" in args.mode or "PhraseRanking" in
         df=SelectDFRows(df,SetTrue,SetFalse)
         if "PublicHealth" in args.Era:
             stop_words.append('public')
-            df=df[df['Viral Tag'].str.contains("PublicHealth")|df['Viral Tag'].str.contains("MitigationMeasures")|df['Viral Tag'].str.contains("ICU")]
+            df=df[~df['Viral Tag'].str.contains("ICU")]
+            df=df[~df['Viral Tag'].str.contains("ACE")]
+            df=df[df['Viral Tag'].str.contains("PublicHealth")|df['Viral Tag'].str.contains("MitigationMeasures")]
+        if "ICU" in args.Era:
+            stop_words.append('public')
+            df=df[df['Viral Tag'].str.contains("ICU")]
         if "ACE" in args.Era:df=df[df['Viral Tag'].str.contains("ACE")]
-        #if "Misc" in args.Era:df=df[df['Viral Tag'].str.contains("CoronaUnclassified") | df['Viral Tag'].str.contains("Pneumonia")| df['Viral Tag'].str.contains("ARDS")]
         if "Zoo" in args.Era:df=df[ df['Viral Tag'].str.contains("ZoonoticCorona")]
         if "Misc" in args.Era:df=df[ ~(df['Viral Tag'].str.contains("ACE") | df['Viral Tag'].str.contains("SARS2003") | df['Viral Tag'].str.contains("MERS") | df['Viral Tag'].str.contains("ZoonoticCorona") | df['Viral Tag'].str.contains("PublicHealth")|df['Viral Tag'].str.contains("MitigationMeasures")|df['Viral Tag'].str.contains("ICU"))]
         if "MERS" in args.Era and "SARS" in args.Era:df=df[df['Viral Tag'].str.contains("SARS2003") & df['Viral Tag'].str.contains("MERS")]
@@ -208,19 +212,11 @@ if("TopicScan" in args.mode or "CreateTopics" in args.mode or "PhraseRanking" in
             f.close()
         SelectedRows=SelectDFRows(df,SetTrue,SetFalse)
         AbstractRankOptimization(stop_words,SelectedRows,AllTopicKeyWords,args.pyTextRank)
-'''
-if  in args.mode:
-    YearChunks=args.Years
-    no_topics=args.topics
-    fbase=args.Era
-    for y in range(0,len(YearChunks)-1):
-        dfcsv="ProcessedCSV/AnalyzedTitles%sto%s.csv" %(YearChunks[y],YearChunks[y+1])
-        df=pd.read_csv(dfcsv, low_memory=False)
-        SelectedRows=SelectDFRows(df,SetTrue,SetFalse)
-'''
 
 if "CreateSummaries" in args.mode:
     for i in range(args.topics):RunSummaries(PATH,args.Era+".csv",i)
+    #for i in range(8,9):RunSummaries(PATH,args.Era+".csv",i)
+
 if "WriteSummaries"in args.mode:
     dictLabels={}
     LabelsList=args.TopicLabels
