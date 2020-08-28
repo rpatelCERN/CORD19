@@ -8,7 +8,7 @@ import seaborn as sns
 import matplotlib
 import sys
 
-def AbstractRankedPhrases(KeywordsinTopic,nlp,minRank,maxcount,highrank,highcount,SelectedRows):####Use pyTextRank
+def AbstractRankedPhrases(KeywordsinTopic,nlp,minRank,maxcount,SelectedRows):####Use pyTextRank
     SelectedRows.loc[SelectedRows['abstract'].notnull(),'FilledAbs']=True
     SelectedRows.loc[SelectedRows['abstract'].isnull(),'FilledAbs']=False
     SelectedRows.loc[SelectedRows['abstract']=='abstract','FilledAbs']=False
@@ -53,7 +53,7 @@ def AbstractRankedPhrases(KeywordsinTopic,nlp,minRank,maxcount,highrank,highcoun
         frequency.append(p.count)#### the frequency
         phrase.append(p.text)
         if p.count>=maxcount:continue
-        if p.rank>highrank and p.count<=highcount:PassingMatches.append(p.text)# and p.count>=6):print(p.text,p.rank,p.count)
+        #if p.rank>highrank and p.count<=highcount:PassingMatches.append(p.text)# and p.count>=6):print(p.text,p.rank,p.count)
         for kw in KeywordsinTopic:
                 #if kw in p.text and p.rank<0.02:print(p.text,p.rank)
                 if kw in p.text and p.rank>minRank:
@@ -93,7 +93,7 @@ def AbstractRankOptimization(stop_words,SelectedRows,AllTopicKeyWords,minRank):
     nlp.disable_pipes("ner")
     for w in stop_words:nlp.vocab[w].is_stop = True;
     stop_words.extend('coronavirus')
-    KeyPhrases,PassPhrases=AbstractRankedPhrases(AllTopicKeyWords,nlp,minRank,40,0.06,5,SelectedRows)
+    KeyPhrases,PassPhrases=AbstractRankedPhrases(AllTopicKeyWords,nlp,minRank,40,SelectedRows)
     #print(KeyPhrases)
     print(PassPhrases)
     print(len(PassPhrases))
