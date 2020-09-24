@@ -62,7 +62,7 @@ def CreateNMFTopics(skl_texts,no_features,no_topics):
     tfidf = tfidf_vectorizer.fit_transform(skl_texts)
     tfidf_feature_names = tfidf_vectorizer.get_feature_names()
 
-    dictDuplicateTerms=CreateNgramsDict(tfidf,tfidf_feature_names,50)
+    dictDuplicateTerms=CreateNgramsDict(tfidf,tfidf_feature_names,100)
     tfidf=CleanNgrams(dictDuplicateTerms,tfidf,tfidf_feature_names)
     nmf = NMF(n_components=no_topics, random_state=1,beta_loss='kullback-leibler', solver='mu', max_iter=1000, alpha=.1,l1_ratio=.5).fit(tfidf)
     return nmf,tfidf_feature_names,tfidf

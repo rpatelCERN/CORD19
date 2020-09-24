@@ -30,7 +30,7 @@ def AddSpacyMatchTokens(nlp):
     matcher.add("ZoonoticFlu",None, AnimalFlu)
 
     #### The same for coronaviruses
-    ZooCorona=[{"LOWER":{'IN':["avian","feline","equine","canine","murine","bat","porcine","bovine","bat","coronavirus"]}},{"LOWER":{'IN':["coronavirus","coronaviruses", "respiratory coronavirus","enteric coronavirus","hku15","coronavirus-512","delta coronavirus","deltacoronavirus"]}}]
+    ZooCorona=[{"LOWER":{'IN':["avian","feline","equine","canine","murine","bat","porcine","bovine","bat","coronavirus","pangolin"]}},{"LOWER":{'IN':["coronavirus","coronaviruses", "respiratory coronavirus","enteric coronavirus","hku15","coronavirus-512","delta coronavirus","deltacoronavirus"]}}]
     HumanCorona=[{"LOWER":"human"},{"LOWER":"coronavirus"},{"LOWER":{'IN':["nl63","oc43","oc 43","229e","HKU1","229E-infected","infections"]},"OP": "*"}]
     CoronaRemainder=[{"LOWER":{'NOT_IN':["equine","canine","murine","bat","porcine","bovine"]},"OP":"?"},{"LOWER":{'IN':["coronavirus","coronaviruses", "respiratory coronavirus"]}}]
     CommonCold=[{"LOWER":"common"},{"LOWER":"cold"}]
@@ -64,6 +64,8 @@ def AddSpacyMatchTokens(nlp):
 
     PCR=[{"LOWER":"reverse","OP":"?"},{"LOWER":"transcription","OP":"?"},{"IS_PUNCT": True,"OP":"?"},{"LOWER":"polymerase"}, {"LOWER":"chain"},{"LOWER":"reaction"}]
     matcher.add("PCR", None, PCR)
+    CT=[{"LOWER":{"IN":["chest","ct"]},"OP":"+"}, {"LOWER":{"IN":["scans", "scan","findings", "ct"]}, "OP":"+"}]
+    matcher.add("CT",None,CT)
     ACE=[{"LOWER":"angiotensin", "OP":"?"}, {"LOWER":"convert"}, {"LOWER":"enzyme"}]
     ACE2=[{"LOWER":"ace2"}]
     matcher.add("ACE",None,ACE)
@@ -83,7 +85,6 @@ def AddSpacyMatchPatterns(nlp):
     #####NOTE Patterns are case sensitive so may still need token matching for more coverage
     #### Titles though are always capitalized
     covid19_synonyms=["COVID","covid","SARS-CoV-2","2019-nCoV","severe acute respiratory syndrome coronavirus","novel coronavirus","novel human coronavirus","ncov ","wuhan coronavirus","coronavirus disease"]###First three based on my inital guess, the rest found with 2nd step using pyTextRank from all the found titles in a wordbag
-
     patterns = [nlp.make_doc(text) for text in covid19_synonyms]#### OR Could be more general as a list of dicts
     matcher.add("COVID19", None, *patterns)
     HIVNames=["HIV-1", "HIV-2","HIV","AIDS","human immunodeficiency virus"];
@@ -124,6 +125,20 @@ def AddSpacyMatchPatterns(nlp):
     matcher.add("MitigationMeasures", None, *patterns)
     patterns=[nlp.make_doc('feline infectious peritonitis')]
     matcher.add("ZoonoticCorona",None, *patterns)
+
+    CT=['computed tomography', 'chest computed tomography']
+    patterns = [nlp.make_doc(text) for text in CT]
+    matcher.add("CT",None, *patterns)
+    NA=['nucleic acid test','nucleic acid tests','nucleic acid testing', 'nucleic acid detection']
+    patterns=[nlp.make_doc(text) for text in NA]
+    matcher.add("NuclAcid",None, *patterns)
+    DiagTesting=['polymerase chain reaction', 'nasopharyngeal swabs', 'diagnostic testing', 'lung ultrasound', 'imaging findings','ground glass']
+    patterns=[nlp.make_doc(text) for text in DiagTesting]
+    matcher.add("Diagnostics",None, *patterns)
+    CriticalPatients=['transplant recipients', 'kidney transplant','cardiac surgery', 'respiratory failure','liver injury','pregnant women','pregnant patients','rheumatic diseases','pregnant woman','inflammatory bowel','cancer care','cancer patients','ulcerative colitis','cardiac injury','breast cancer','stroke patients']
+    patterns=[nlp.make_doc(text) for text in CriticalPatients]
+    matcher.add("CriticalPatients",None, *patterns)
+
     return matcher;
 
 def MatchTitlePhrasesAndAbstract(Titlephrases, AbstractPhrases ):
