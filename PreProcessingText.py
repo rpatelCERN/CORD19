@@ -61,7 +61,7 @@ def CreateNgramsDict(sparsematrix,features,no_most_frequent):
         for w2 in terms:
             if(w1==w2):continue
             lev=fuzz.ratio(w1,w2);
-            if(lev>=66 and lev<100):
+            if(lev>=64 and lev<100):
                 ### Choose the longest n-gram: prioritize trigrams
                 if(len(w1.split(" "))==len(w2.split(" "))):continue
                 if(len(w1)>len(w2)):

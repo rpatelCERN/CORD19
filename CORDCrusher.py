@@ -72,7 +72,7 @@ if("RAKE" in args.mode):
 #####ERA Flags:
 SetTrue=[]
 SetFalse=[]
-perplexity=150
+perplexity=170
 
 fcsv="ProcessedCSV/AnalyzedTitles2019to2021.csv"
 if args.Era=="HumanDiseases1970to1990" or args.Era=="Zoonotic1970to1990":
@@ -159,7 +159,7 @@ if("RakedKeywords" in args.mode):
         df=SelectDFRows(df,SetTrue,SetFalse)
         print(df.head())
         KeyWords=df['Title Qualifier Words'].tolist()
-        CompareNGramCleaning(KeyWords,50,10)
+        CompareNGramCleaning(KeyWords,50,15)
         del df
 
 if("TopicScan" in args.mode or "CreateTopics" in args.mode or "PhraseRanking" in args.mode  ):
@@ -198,7 +198,17 @@ if("TopicScan" in args.mode or "CreateTopics" in args.mode or "PhraseRanking" in
             df=df[df['Viral Tag'].str.contains("ICU")]
         if "ACE" in args.Era:df=df[df['Viral Tag'].str.contains("ACE")]
         if "Zoo" in args.Era:df=df[ df['Viral Tag'].str.contains("ZoonoticCorona")]
-        if "Misc" in args.Era:df=df[ ~(df['Viral Tag'].str.contains("ACE") | df['Viral Tag'].str.contains("SARS2003") | df['Viral Tag'].str.contains("MERS") | df['Viral Tag'].str.contains("ZoonoticCorona") | df['Viral Tag'].str.contains("PublicHealth")|df['Viral Tag'].str.contains("MitigationMeasures")|df['Viral Tag'].str.contains("ICU"))]
+        #if "Misc" in args.Era:df=df[ ~(df['Viral Tag'].str.contains("ACE") | df['Viral Tag'].str.contains("SARS2003") | df['Viral Tag'].str.contains("MERS") | df['Viral Tag'].str.contains("ZoonoticCorona") | df['Viral Tag'].str.contains("PublicHealth")|df['Viral Tag'].str.contains("MitigationMeasures")|df['Viral Tag'].str.contains("ICU"))]
+        if "Diagnostics" in args.Era:
+            stop_words.append('disease')
+            stop_words.append('pandemic')
+            df=df[df['Viral Tag'].str.contains("PCR")|df['Viral Tag'].str.contains("Diagnostics")| df['Viral Tag'].str.contains("NuclAcid")|df['Viral Tag'].str.contains("CT")|df['Viral Tag'].str.contains("ELISA")]
+        if "CriticalPatients" in args.Era:
+            stop_words.append('disease')
+            stop_words.append('pandemic')
+            stop_words.append('organization')
+
+            df=df[df['Viral Tag'].str.contains("CriticalPatients")]
         if "MERS" in args.Era and "SARS" in args.Era:df=df[df['Viral Tag'].str.contains("SARS2003") & df['Viral Tag'].str.contains("MERS")]
     if"TopicScan" in args.mode:RunTopicScans(df,SetTrue,SetFalse,stop_words,Topics,fout,perplexity)
     if"CreateTopics" in args.mode:RunTopicBuilding(df,PATH,SetTrue,SetFalse,no_topics,outputDFname,stop_words,args.pyTextRank)
